@@ -1008,7 +1008,7 @@ export async function migrateCurrentDataToTarget(targetConfig: DatabaseConnectio
           const upsertSql = updateSets
             ? `INSERT INTO ${table} (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT ("${primaryKey}") DO UPDATE SET ${updateSets};`
             : `INSERT INTO ${table} (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT ("${primaryKey}") DO NOTHING;`;
-          await targetPool.query(upsertSql, [...values, ...updateValues]);
+          await targetPool.query(upsertSql, values);
           rowsMigrated++;
         }
       }
