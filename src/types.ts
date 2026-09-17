@@ -43,6 +43,7 @@ export interface BIMUNSettings {
     contacto: boolean;
   };
   gallery_categories?: string[];
+  tradition_years?: string;
 }
 
 export interface AboutSection {

@@ -842,14 +842,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs text-slate-400">Edición</label>
-                      <input
-                        type="text"
-                        value={settings.bimun_edition}
-                        onChange={(e) => setSettings({ ...settings, bimun_edition: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-400">Edición</label>
+                        <input
+                          type="text"
+                          value={settings.bimun_edition}
+                          onChange={(e) => setSettings({ ...settings, bimun_edition: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-slate-400">Años de Tradición</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={settings.tradition_years || '27'}
+                          onChange={(e) => setSettings({ ...settings, tradition_years: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-1 sm:col-span-2">

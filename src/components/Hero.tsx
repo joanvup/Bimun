@@ -95,6 +95,19 @@ export const Hero: React.FC<HeroProps> = ({ settings, committeesCount, countries
   const secondaryLink = settings.cta_secondary_link || '#comisiones';
   const tertiaryLink = settings.cta_tertiary_link || '#documentos';
 
+  // Calculate diplomatic days
+  let diplomaticDays = 3;
+  if (settings.start_date && settings.end_date) {
+    const start = new Date(settings.start_date);
+    const end = new Date(settings.end_date);
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      // Add 1 to include both start and end days
+      diplomaticDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    }
+  }
+
+  const traditionYears = settings.tradition_years || '27';
+
   return (
     <section id="inicio" className="relative min-h-[92vh] flex flex-col justify-between pt-32 sm:pt-36 pb-8 overflow-hidden bg-slate-950 text-white">
       {/* Background Image / Video with Cinematic Dynamic Gradients */}
@@ -247,19 +260,19 @@ export const Hero: React.FC<HeroProps> = ({ settings, committeesCount, countries
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center divide-y md:divide-y-0 md:divide-x divide-slate-800/80">
             <div className="pt-2 md:pt-0">
-              <p className="text-3xl sm:text-4xl font-black text-blue-400 font-display drop-shadow-sm">{committeesCount || 8}</p>
+              <p className="text-3xl sm:text-4xl font-black text-blue-400 font-display drop-shadow-sm">{committeesCount || 0}</p>
               <p className="text-xs uppercase tracking-wider text-slate-300 font-semibold mt-1">{t.hero.stat_committees}</p>
             </div>
             <div className="pt-2 md:pt-0">
-              <p className="text-3xl sm:text-4xl font-black text-amber-300 font-display drop-shadow-sm">{countriesCount || 20}+</p>
+              <p className="text-3xl sm:text-4xl font-black text-amber-300 font-display drop-shadow-sm">{countriesCount || 0}+</p>
               <p className="text-xs uppercase tracking-wider text-slate-300 font-semibold mt-1">{t.hero.stat_delegations}</p>
             </div>
             <div className="pt-2 md:pt-0">
-              <p className="text-3xl sm:text-4xl font-black text-emerald-400 font-display drop-shadow-sm">{language === 'en' ? '3 Days' : '3 Días'}</p>
+              <p className="text-3xl sm:text-4xl font-black text-emerald-400 font-display drop-shadow-sm">{diplomaticDays} {language === 'en' ? 'Days' : 'Días'}</p>
               <p className="text-xs uppercase tracking-wider text-slate-300 font-semibold mt-1">{t.hero.stat_days}</p>
             </div>
             <div className="pt-2 md:pt-0">
-              <p className="text-3xl sm:text-4xl font-black text-indigo-400 font-display drop-shadow-sm">{language === 'en' ? '27 Years' : '27 Años'}</p>
+              <p className="text-3xl sm:text-4xl font-black text-indigo-400 font-display drop-shadow-sm">{traditionYears} {language === 'en' ? 'Years' : 'Años'}</p>
               <p className="text-xs uppercase tracking-wider text-slate-300 font-semibold mt-1">{t.hero.stat_tradition}</p>
             </div>
           </div>

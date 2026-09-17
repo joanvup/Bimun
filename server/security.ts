@@ -178,6 +178,7 @@ const PUBLIC_SETTINGS_WHITELIST = new Set([
   'active_sections',
   'event_dates_iso',
   'gallery_categories',
+  'tradition_years',
   'cta_primary_text',
   'cta_primary_link',
   'cta_secondary_text',
