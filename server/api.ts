@@ -3,8 +3,14 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { queryAll, queryOne, runSql, getDb, clearDemoData, reloadDemoData, resetDefaultAboutSections, resetDefaultGallery } from './db.ts';
 import { getSmtpConfig, saveSmtpConfig, verifySmtpConnection, sendTestEmail } from './email.ts';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'bimun_valledupar_secret_key_2026_un_model';
+import {
+  SECURE_JWT_SECRET,
+  loginRateLimiter,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+  registerRateLimiter,
+  filterPublicSettings,
+} from './security.ts';
 
 export const apiRouter = Router();
 
@@ -17,7 +23,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, SECURE_JWT_SECRET) as any;
     (req as any).user = decoded;
     next();
   } catch (err) {
@@ -138,8 +144,11 @@ apiRouter.get('/public/data', async (req, res) => {
     // News
     const news = queryAll('SELECT * FROM news WHERE is_published = 1 ORDER BY publish_date DESC;');
 
+    // Filter settings through strict whitelist to guarantee zero leakage of sensitive keys (e.g. SMTP passwords)
+    const sanitizedSettings = filterPublicSettings(settings);
+
     res.json({
-      settings,
+      settings: sanitizedSettings,
       about,
       committees,
       countries,
@@ -156,8 +165,8 @@ apiRouter.get('/public/data', async (req, res) => {
   }
 });
 
-// Public registration submission
-apiRouter.post('/public/register', async (req, res) => {
+// Public registration submission (protected with rate limiter against spam)
+apiRouter.post('/public/register', registerRateLimiter, async (req, res) => {
   try {
     await getDb();
     const {
@@ -222,10 +231,10 @@ apiRouter.post('/public/register', async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// AUTH ENDPOINTS
+// AUTH ENDPOINTS (with brute-force protection & JWT signing)
 // -------------------------------------------------------------
 
-apiRouter.post('/auth/login', async (req, res) => {
+apiRouter.post('/auth/login', loginRateLimiter, async (req, res) => {
   try {
     await getDb();
     const { username, password } = req.body;
@@ -235,17 +244,22 @@ apiRouter.post('/auth/login', async (req, res) => {
 
     const user = queryOne('SELECT * FROM users WHERE username = ?;', [username.trim()]);
     if (!user) {
+      recordFailedLogin(req);
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
     const validPassword = bcrypt.compareSync(password, user.password_hash);
     if (!validPassword) {
+      recordFailedLogin(req);
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
+    // Clear failed login tracker on success
+    recordSuccessfulLogin(req);
+
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, display_name: user.display_name },
-      JWT_SECRET,
+      SECURE_JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -269,13 +283,37 @@ apiRouter.get('/auth/me', authMiddleware, (req, res) => {
   res.json({ user: (req as any).user });
 });
 
+// Endpoint to audit default security state (checks if user is still using default credentials)
+apiRouter.get('/auth/security-audit', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    const dbUser = queryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?;', [user.id]);
+    
+    // Check if the current password is still the default 'bimun2026'
+    const isUsingDefaultPassword = dbUser ? bcrypt.compareSync('bimun2026', dbUser.password_hash) : false;
+    const hasCustomJwtSecret = Boolean(process.env.JWT_SECRET && process.env.JWT_SECRET !== 'bimun_valledupar_secret_key_2026_un_model');
+
+    res.json({
+      success: true,
+      audit: {
+        is_using_default_password: isUsingDefaultPassword,
+        has_custom_jwt_secret: hasCustomJwtSecret,
+        username: user.username,
+        role: user.role,
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error en auditoría de seguridad', details: err.message });
+  }
+});
+
 apiRouter.post('/auth/change-password', authMiddleware, (req, res) => {
   try {
     const user = (req as any).user;
     const { current_password, new_password } = req.body;
 
-    if (!current_password || !new_password || new_password.length < 6) {
-      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
+    if (!current_password || !new_password || new_password.length < 8) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres para producción.' });
     }
 
     const dbUser = queryOne('SELECT * FROM users WHERE id = ?;', [user.id]);

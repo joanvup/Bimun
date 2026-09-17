@@ -4,10 +4,15 @@ import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/api.ts';
 import { getDb } from './server/db.ts';
 import { initializeDatabaseManager } from './server/dbManager.ts';
+import { securityHeadersMiddleware } from './server/security.ts';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Security: Remove server banner and inject OWASP security headers
+  app.disable('x-powered-by');
+  app.use(securityHeadersMiddleware);
 
   // Initialize Database Manager (SQLite, PostgreSQL or MySQL)
   await initializeDatabaseManager();

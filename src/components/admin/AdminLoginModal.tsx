@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, X, Shield, AlertCircle, KeyRound, User } from 'lucide-react';
+import { Lock, X, Shield, AlertCircle, KeyRound, User, Eye, EyeOff } from 'lucide-react';
 import { AdminUser } from '../../types.ts';
 import { useLanguage } from '../../context/LanguageContext.tsx';
 
@@ -15,8 +15,9 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onLoginSuccess,
 }) => {
   const { language, t } = useLanguage();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('bimun2026');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +32,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
       const data = await res.json();
@@ -87,9 +88,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               <input
                 type="text"
                 required
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
+                placeholder={language === 'en' ? 'Enter username' : 'Ingresa tu usuario'}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
               />
             </div>
@@ -100,47 +102,44 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             <div className="relative">
               <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                className="w-full pl-9 pr-11 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-100 text-[11px] text-blue-900 leading-relaxed">
-            <strong>
-              {language === 'en' ? 'Default pre-configured credentials:' : 'Credenciales iniciales preconfiguradas:'}
-            </strong>
-            <br />
-            {language === 'en' ? 'Username: ' : 'Usuario: '}<code className="font-mono font-bold">admin</code> | {language === 'en' ? 'Password: ' : 'Clave: '}<code className="font-mono font-bold">bimun2026</code>
-            <br />
-            <span className="text-blue-700 italic">
-              {language === 'en'
-                ? 'You can change them in the Security tab inside the CMS.'
-                : 'Podrás cambiarlas en la pestaña de Seguridad del panel.'}
-            </span>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>{language === 'en' ? 'Validating...' : 'Validando...'}</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  <span>{t.admin_modal.login_btn}</span>
+                </>
+              )}
+            </button>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>{language === 'en' ? 'Validating...' : 'Validando...'}</span>
-              </>
-            ) : (
-              <>
-                <Lock className="w-4 h-4" />
-                <span>{t.admin_modal.login_btn}</span>
-              </>
-            )}
-          </button>
         </form>
       </div>
     </div>

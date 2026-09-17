@@ -15,6 +15,7 @@ import { ContactSection } from './components/ContactSection.tsx';
 import { Footer } from './components/Footer.tsx';
 import { AdminLoginModal } from './components/admin/AdminLoginModal.tsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
+import { ScrollToTopButton } from './components/ScrollToTopButton.tsx';
 import { PublicDataResponse, AdminUser } from './types.ts';
 
 export default function App() {
@@ -263,6 +264,9 @@ export default function App() {
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
       />
+
+      {/* Floating Scroll to Top Button */}
+      <ScrollToTopButton />
     </div>
   );
 }

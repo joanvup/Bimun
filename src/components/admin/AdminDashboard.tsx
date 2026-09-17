@@ -80,6 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [confirmClearModalOpen, setConfirmClearModalOpen] = useState(false);
   const [confirmReloadModalOpen, setConfirmReloadModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [securityAudit, setSecurityAudit] = useState<{ is_using_default_password: boolean; has_custom_jwt_secret: boolean } | null>(null);
 
   // About tab state
   const [editingAbout, setEditingAbout] = useState<Partial<AboutSection> | null>(null);
@@ -166,6 +167,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       if (tmRes.ok) setTeam(await tmRes.json());
       if (nwRes.ok) setNews(await nwRes.json());
+
+      // Fetch security audit for current logged in user
+      try {
+        const auditRes = await authFetch('/api/auth/security-audit');
+        if (auditRes.ok) {
+          const auditData = await auditRes.json();
+          if (auditData && auditData.audit) {
+            setSecurityAudit(auditData.audit);
+          }
+        }
+      } catch (e) {
+        // silent audit error
+      }
     } catch (err: any) {
       showStatus(err.message || 'Error al cargar datos administrativos', 'error');
     } finally {
@@ -393,6 +407,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         showStatus('Contraseña actualizada con éxito.');
         setCurrentPassword('');
         setNewPassword('');
+        // Refresh security audit state
+        try {
+          const auditRes = await authFetch('/api/auth/security-audit');
+          if (auditRes.ok) {
+            const auditData = await auditRes.json();
+            if (auditData && auditData.audit) {
+              setSecurityAudit(auditData.audit);
+            }
+          }
+        } catch {
+          // ignore
+        }
       } else {
         showStatus(data.error || 'Error al cambiar contraseña', 'error');
       }
@@ -609,6 +635,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Actualizar Datos</span>
                 </button>
               </div>
+
+              {/* Production Security Alert (Shown if using default credentials or default secret in production) */}
+              {securityAudit?.is_using_default_password && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                        <span>Aviso de Seguridad: Contraseña por Defecto Detectada</span>
+                      </h4>
+                      <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                        Tu cuenta de administrador está usando actualmente la clave inicial por defecto asignada durante la instalación. Al estar la plataforma en producción, te recomendamos cambiarla de inmediato por una clave personalizada para blindar el acceso.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('settings')}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider shrink-0 transition-colors shadow-sm"
+                  >
+                    Cambiar Contraseña
+                  </button>
+                </div>
+              )}
 
               {/* Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2255,10 +2307,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Password update form */}
               <form onSubmit={handleChangePassword} className="p-6 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-                  <Key className="w-4 h-4" />
-                  <span>Modificar Contraseña de Administrador</span>
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                    <Key className="w-4 h-4" />
+                    <span>Seguridad y Contraseña de Administrador</span>
+                  </h3>
+                  {securityAudit?.is_using_default_password ? (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Requiere cambio (Contraseña por defecto)
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Contraseña personalizada protegida
+                    </span>
+                  )}
+                </div>
 
                 <div className="space-y-1">
                   <label className="text-xs text-slate-400">Contraseña Actual</label>
@@ -2273,20 +2338,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400">Nueva Contraseña (mínimo 6 caracteres)</label>
+                  <label className="text-xs text-slate-400">Nueva Contraseña (mínimo 8 caracteres)</label>
                   <input
                     type="password"
                     required
+                    minLength={8}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Mínimo 8 caracteres alfanuméricos"
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-colors"
                 >
                   Actualizar Contraseña
                 </button>
