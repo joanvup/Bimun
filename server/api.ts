@@ -1,0 +1,1773 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { queryAll, queryOne, runSql, getDb, clearDemoData, reloadDemoData, resetDefaultAboutSections, resetDefaultGallery } from './db.ts';
+import { getSmtpConfig, saveSmtpConfig, verifySmtpConnection, sendTestEmail } from './email.ts';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'bimun_valledupar_secret_key_2026_un_model';
+
+export const apiRouter = Router();
+
+// Helper to authenticate JWT
+export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No autorizado. Se requiere token válido.' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    (req as any).user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+}
+
+// Helper to check admin/superadmin role
+export function adminOnlyMiddleware(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
+    return res.status(403).json({ error: 'Acceso denegado. Se requieren privilegios de administrador.' });
+  }
+  next();
+}
+
+// Helper to check roles permitted to edit institutional content (Admin, Superadmin, Coordinador, Academico)
+export function canEditInstitutionalContent(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  const allowedRoles = ['admin', 'superadmin', 'coordinador', 'academico'];
+  if (!user || !allowedRoles.includes(user.role)) {
+    return res.status(403).json({
+      error: 'Acceso denegado. Este apartado está reservado para Administradores, Coordinación y Dirección Académica.',
+    });
+  }
+  next();
+}
+
+// -------------------------------------------------------------
+// PUBLIC ENDPOINTS
+// -------------------------------------------------------------
+
+// Comprehensive public bundle for high performance
+apiRouter.get('/public/data', async (req, res) => {
+  try {
+    await getDb();
+
+    // Settings
+    const rawSettings = queryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
+    const settings: Record<string, any> = {};
+    for (const s of rawSettings) {
+      if (s.key === 'active_sections' || s.key === 'event_dates_iso' || s.key === 'gallery_categories') {
+        try {
+          settings[s.key] = JSON.parse(s.value);
+        } catch {
+          settings[s.key] = s.value;
+        }
+      } else {
+        settings[s.key] = s.value;
+      }
+    }
+
+    if (!settings.gallery_categories || !Array.isArray(settings.gallery_categories) || settings.gallery_categories.length === 0) {
+      settings.gallery_categories = [
+        'Debate',
+        'Protocolo',
+        'Negociación',
+        'Crisis',
+        'Premiación',
+        'Campus',
+        'Social',
+        'Inauguración',
+        'Clausura',
+      ];
+    }
+
+    if (!settings.start_date) {
+      if (settings.event_dates_iso && typeof settings.event_dates_iso === 'object' && settings.event_dates_iso.start) {
+        settings.start_date = settings.event_dates_iso.start;
+      } else {
+        settings.start_date = '2026-10-23';
+      }
+    }
+    if (!settings.end_date) {
+      if (settings.event_dates_iso && typeof settings.event_dates_iso === 'object' && settings.event_dates_iso.end) {
+        settings.end_date = settings.event_dates_iso.end;
+      } else {
+        settings.end_date = '2026-10-25';
+      }
+    }
+    if (!settings.inauguration_time) {
+      settings.inauguration_time = '08:30';
+    }
+
+    // Active About sections
+    const about = queryAll('SELECT * FROM about_sections WHERE is_active = 1 ORDER BY sort_order ASC;');
+
+    // Active Committees
+    const committees = queryAll('SELECT * FROM committees WHERE status != "archived" ORDER BY sort_order ASC;');
+
+    // Active Countries
+    const countries = queryAll('SELECT * FROM countries WHERE status = "active" ORDER BY name ASC;');
+
+    // Delegations with Committee and Country joins
+    const delegations = queryAll(`
+      SELECT 
+        d.id, d.committee_id, d.country_id, d.delegate_name, d.delegate_school, d.status,
+        c.name as committee_name, c.abbreviation as committee_abbr, c.language as committee_language,
+        cnt.name as country_name, cnt.code as country_code, cnt.flag_emoji, cnt.flag_url
+      FROM delegations d
+      JOIN committees c ON d.committee_id = c.id
+      JOIN countries cnt ON d.country_id = cnt.id
+      ORDER BY c.sort_order ASC, cnt.name ASC;
+    `);
+
+    // Schedule
+    const schedule = queryAll('SELECT * FROM schedule ORDER BY date ASC, sort_order ASC;');
+
+    // Documents
+    const documents = queryAll('SELECT * FROM documents ORDER BY is_featured DESC, sort_order ASC;');
+
+    // Gallery
+    const gallery = queryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
+
+    // Organizing team
+    const team = queryAll('SELECT * FROM organizing_team ORDER BY sort_order ASC;');
+
+    // News
+    const news = queryAll('SELECT * FROM news WHERE is_published = 1 ORDER BY publish_date DESC;');
+
+    res.json({
+      settings,
+      about,
+      committees,
+      countries,
+      delegations,
+      schedule,
+      documents,
+      gallery,
+      team,
+      news,
+    });
+  } catch (err: any) {
+    console.error('Error fetching public data:', err);
+    res.status(500).json({ error: 'Error al consultar datos públicos', details: err.message });
+  }
+});
+
+// Public registration submission
+apiRouter.post('/public/register', async (req, res) => {
+  try {
+    await getDb();
+    const {
+      full_name,
+      email,
+      phone,
+      school,
+      delegation_type,
+      grade,
+      committee_preference_1,
+      committee_preference_2,
+      country_preference_1,
+      country_preference_2,
+      experience,
+      dietary_medical,
+      emergency_contact,
+      payment_receipt,
+    } = req.body;
+
+    if (!full_name || !email || !phone || !school || !delegation_type) {
+      return res.status(400).json({ error: 'Todos los campos obligatorios deben ser completados.' });
+    }
+
+    const regId = 'reg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const now = new Date().toISOString();
+
+    runSql(
+      `INSERT INTO registrations (
+        id, full_name, email, phone, school, delegation_type, grade,
+        committee_preference_1, committee_preference_2, country_preference_1, country_preference_2,
+        experience, dietary_medical, emergency_contact, payment_receipt, status, assigned_committee_id, assigned_country_id, notes, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', '', ?)`,
+      [
+        regId,
+        full_name,
+        email,
+        phone,
+        school,
+        delegation_type,
+        grade || '',
+        committee_preference_1 || '',
+        committee_preference_2 || '',
+        country_preference_1 || '',
+        country_preference_2 || '',
+        experience || '',
+        dietary_medical || '',
+        emergency_contact || '',
+        payment_receipt || '',
+        now,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: '¡Inscripción recibida exitosamente! La Secretaría General se comunicará contigo pronto.',
+      registration_id: regId,
+    });
+  } catch (err: any) {
+    console.error('Error submitting registration:', err);
+    res.status(500).json({ error: 'Error al procesar la inscripción', details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// AUTH ENDPOINTS
+// -------------------------------------------------------------
+
+apiRouter.post('/auth/login', async (req, res) => {
+  try {
+    await getDb();
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+    }
+
+    const user = queryOne('SELECT * FROM users WHERE username = ?;', [username.trim()]);
+    if (!user) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const validPassword = bcrypt.compareSync(password, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role, display_name: user.display_name },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name,
+        role: user.role,
+      },
+    });
+  } catch (err: any) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Error durante la autenticación', details: err.message });
+  }
+});
+
+apiRouter.get('/auth/me', authMiddleware, (req, res) => {
+  res.json({ user: (req as any).user });
+});
+
+apiRouter.post('/auth/change-password', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { current_password, new_password } = req.body;
+
+    if (!current_password || !new_password || new_password.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    const dbUser = queryOne('SELECT * FROM users WHERE id = ?;', [user.id]);
+    if (!dbUser || !bcrypt.compareSync(current_password, dbUser.password_hash)) {
+      return res.status(401).json({ error: 'La contraseña actual es incorrecta.' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(new_password, salt);
+    runSql('UPDATE users SET password_hash = ? WHERE id = ?;', [hash, user.id]);
+
+    res.json({ success: true, message: 'Contraseña actualizada correctamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al cambiar contraseña', details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// ADMIN PROTECTED ENDPOINTS
+// -------------------------------------------------------------
+
+// Dashboard statistics
+apiRouter.get('/admin/stats', authMiddleware, (req, res) => {
+  try {
+    const comCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM committees;')?.count || 0;
+    const delTotal = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations;')?.count || 0;
+    const delAssigned = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations WHERE status = "assigned";')?.count || 0;
+    const regPending = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations WHERE status = "pending";')?.count || 0;
+    const regTotal = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations;')?.count || 0;
+    const cntCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM countries;')?.count || 0;
+    const docCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM documents;')?.count || 0;
+    const newsCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM news;')?.count || 0;
+
+    res.json({
+      committees_total: comCount,
+      delegations_total: delTotal,
+      delegations_assigned: delAssigned,
+      delegations_available: delTotal - delAssigned,
+      registrations_pending: regPending,
+      registrations_total: regTotal,
+      countries_total: cntCount,
+      documents_total: docCount,
+      news_total: newsCount,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener estadísticas', details: err.message });
+  }
+});
+
+// Settings CRUD
+apiRouter.get('/admin/settings', authMiddleware, (req, res) => {
+  const rows = queryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
+  const settingsObj: Record<string, any> = {};
+  for (const r of rows) {
+    try {
+      settingsObj[r.key] = JSON.parse(r.value);
+    } catch {
+      settingsObj[r.key] = r.value;
+    }
+  }
+  if (!settingsObj.start_date) {
+    if (settingsObj.event_dates_iso && typeof settingsObj.event_dates_iso === 'object' && settingsObj.event_dates_iso.start) {
+      settingsObj.start_date = settingsObj.event_dates_iso.start;
+    } else {
+      settingsObj.start_date = '2026-10-23';
+    }
+  }
+  if (!settingsObj.end_date) {
+    if (settingsObj.event_dates_iso && typeof settingsObj.event_dates_iso === 'object' && settingsObj.event_dates_iso.end) {
+      settingsObj.end_date = settingsObj.event_dates_iso.end;
+    } else {
+      settingsObj.end_date = '2026-10-25';
+    }
+  }
+  if (!settingsObj.inauguration_time) {
+    settingsObj.inauguration_time = '08:30';
+  }
+  res.json(settingsObj);
+});
+
+apiRouter.put('/admin/settings', authMiddleware, (req, res) => {
+  try {
+    const updates: Record<string, any> = req.body;
+    const now = new Date().toISOString();
+
+    for (const [key, val] of Object.entries(updates)) {
+      const valStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      runSql(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+        [key, valStr, now]
+      );
+    }
+
+    res.json({ success: true, message: 'Configuración guardada exitosamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar configuraciones', details: err.message });
+  }
+});
+
+// Committees CRUD
+apiRouter.get('/admin/committees', authMiddleware, (req, res) => {
+  const committees = queryAll('SELECT * FROM committees ORDER BY sort_order ASC, name ASC;');
+  res.json(committees);
+});
+
+apiRouter.post('/admin/committees', authMiddleware, (req, res) => {
+  try {
+    const {
+      code,
+      name,
+      abbreviation,
+      description,
+      image_url,
+      language,
+      topic_a,
+      topic_b,
+      topic_c,
+      president_name,
+      president_photo,
+      vicepresident_name,
+      vicepresident_photo,
+      status,
+      sort_order,
+    } = req.body;
+
+    if (!name || !abbreviation || !code || !topic_a) {
+      return res.status(400).json({ error: 'Nombre, código, sigla y Tema A son obligatorios.' });
+    }
+
+    const id = 'com_' + Date.now();
+    const now = new Date().toISOString();
+
+    runSql(
+      `INSERT INTO committees (
+        id, code, name, abbreviation, description, image_url, language,
+        topic_a, topic_b, topic_c, president_name, president_photo,
+        vicepresident_name, vicepresident_photo, status, sort_order, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        code.trim().toUpperCase(),
+        name.trim(),
+        abbreviation.trim(),
+        description || '',
+        image_url || '',
+        language || 'Español',
+        topic_a.trim(),
+        topic_b || '',
+        topic_c || '',
+        president_name || '',
+        president_photo || '',
+        vicepresident_name || '',
+        vicepresident_photo || '',
+        status || 'active',
+        sort_order || 0,
+        now,
+      ]
+    );
+
+    res.status(201).json({ success: true, id, message: 'Comisión creada con éxito.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear comisión', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/committees/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      code,
+      name,
+      abbreviation,
+      description,
+      image_url,
+      language,
+      topic_a,
+      topic_b,
+      topic_c,
+      president_name,
+      president_photo,
+      vicepresident_name,
+      vicepresident_photo,
+      status,
+      sort_order,
+    } = req.body;
+
+    runSql(
+      `UPDATE committees SET
+        code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
+        topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?, president_photo = ?,
+        vicepresident_name = ?, vicepresident_photo = ?, status = ?, sort_order = ?
+       WHERE id = ?`,
+      [
+        code,
+        name,
+        abbreviation,
+        description,
+        image_url,
+        language,
+        topic_a,
+        topic_b,
+        topic_c,
+        president_name,
+        president_photo,
+        vicepresident_name,
+        vicepresident_photo,
+        status,
+        sort_order,
+        id,
+      ]
+    );
+
+    res.json({ success: true, message: 'Comisión actualizada con éxito.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar comisión', details: err.message });
+  }
+});
+
+// Duplicate a committee
+apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const com = queryOne<any>('SELECT * FROM committees WHERE id = ?;', [id]);
+    if (!com) return res.status(404).json({ error: 'Comisión no encontrada' });
+
+    const newId = 'com_' + Date.now();
+    const newCode = (com.code + '_COPIA').substring(0, 15);
+    const newName = com.name + ' (Copia)';
+    const now = new Date().toISOString();
+
+    runSql(
+      `INSERT INTO committees (
+        id, code, name, abbreviation, description, image_url, language,
+        topic_a, topic_b, topic_c, president_name, president_photo,
+        vicepresident_name, vicepresident_photo, status, sort_order, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newId,
+        newCode,
+        newName,
+        com.abbreviation + ' (C)',
+        com.description,
+        com.image_url,
+        com.language,
+        com.topic_a,
+        com.topic_b,
+        com.topic_c,
+        com.president_name,
+        com.president_photo,
+        com.vicepresident_name,
+        com.vicepresident_photo,
+        'draft',
+        com.sort_order + 1,
+        now,
+      ]
+    );
+
+    res.json({ success: true, id: newId, message: 'Comisión duplicada exitosamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al duplicar comisión', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/committees/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM delegations WHERE committee_id = ?;', [id]);
+    runSql('DELETE FROM committees WHERE id = ?;', [id]);
+    res.json({ success: true, message: 'Comisión eliminada con éxito.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar comisión', details: err.message });
+  }
+});
+
+// Countries CRUD
+apiRouter.get('/admin/countries', authMiddleware, (req, res) => {
+  const countries = queryAll('SELECT * FROM countries ORDER BY name ASC;');
+  res.json(countries);
+});
+
+apiRouter.post('/admin/countries', authMiddleware, (req, res) => {
+  try {
+    const { name, official_name, code, flag_emoji, flag_url, additional_info, status } = req.body;
+    if (!name || !code) {
+      return res.status(400).json({ error: 'Nombre y código ISO son requeridos.' });
+    }
+
+    const id = 'cnt_' + code.toLowerCase().replace(/[^a-z0-9]/g, '');
+    runSql(
+      `INSERT INTO countries (id, name, official_name, code, flag_emoji, flag_url, additional_info, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        name.trim(),
+        official_name || name,
+        code.trim().toUpperCase(),
+        flag_emoji || '🏳️',
+        flag_url || '',
+        additional_info || '',
+        status || 'active',
+      ]
+    );
+
+    res.status(201).json({ success: true, id, message: 'País registrado con éxito.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al registrar país', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/countries/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, official_name, code, flag_emoji, flag_url, additional_info, status } = req.body;
+
+    runSql(
+      `UPDATE countries SET name = ?, official_name = ?, code = ?, flag_emoji = ?, flag_url = ?, additional_info = ?, status = ?
+       WHERE id = ?`,
+      [name, official_name, code, flag_emoji, flag_url, additional_info, status, id]
+    );
+
+    res.json({ success: true, message: 'País actualizado.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar país', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/countries/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM delegations WHERE country_id = ?;', [id]);
+    runSql('DELETE FROM countries WHERE id = ?;', [id]);
+    res.json({ success: true, message: 'País eliminado.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar país', details: err.message });
+  }
+});
+
+// Delegations CRUD (Relación Comisión <-> País <-> Delegado)
+apiRouter.get('/admin/delegations', authMiddleware, (req, res) => {
+  const delegations = queryAll(`
+    SELECT 
+      d.*,
+      c.name as committee_name, c.abbreviation as committee_abbr,
+      cnt.name as country_name, cnt.code as country_code, cnt.flag_emoji
+    FROM delegations d
+    JOIN committees c ON d.committee_id = c.id
+    JOIN countries cnt ON d.country_id = cnt.id
+    ORDER BY c.sort_order ASC, cnt.name ASC;
+  `);
+  res.json(delegations);
+});
+
+apiRouter.post('/admin/delegations', authMiddleware, (req, res) => {
+  try {
+    const { committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes } = req.body;
+    if (!committee_id || !country_id) {
+      return res.status(400).json({ error: 'Comisión y país son requeridos.' });
+    }
+
+    const id = 'del_' + Date.now();
+    const now = new Date().toISOString();
+
+    runSql(
+      `INSERT INTO delegations (
+        id, committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        committee_id,
+        country_id,
+        delegate_name || '',
+        delegate_school || '',
+        delegate_email || '',
+        delegate_phone || '',
+        status || 'available',
+        notes || '',
+        now,
+      ]
+    );
+
+    res.status(201).json({ success: true, id, message: 'Delegación asignada exitosamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear delegación', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/delegations/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes } = req.body;
+
+    runSql(
+      `UPDATE delegations SET
+        committee_id = ?, country_id = ?, delegate_name = ?, delegate_school = ?,
+        delegate_email = ?, delegate_phone = ?, status = ?, notes = ?
+       WHERE id = ?`,
+      [
+        committee_id,
+        country_id,
+        delegate_name || '',
+        delegate_school || '',
+        delegate_email || '',
+        delegate_phone || '',
+        status || 'available',
+        notes || '',
+        id,
+      ]
+    );
+
+    res.json({ success: true, message: 'Delegación actualizada.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar delegación', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/delegations/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM delegations WHERE id = ?;', [id]);
+    res.json({ success: true, message: 'Delegación eliminada.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar delegación', details: err.message });
+  }
+});
+
+// Batch populate country slots for a committee
+apiRouter.post('/admin/delegations/batch-slots', authMiddleware, (req, res) => {
+  try {
+    const { committee_id, country_ids } = req.body;
+    if (!committee_id || !Array.isArray(country_ids) || country_ids.length === 0) {
+      return res.status(400).json({ error: 'Comisión y lista de países son requeridos.' });
+    }
+
+    const now = new Date().toISOString();
+    let createdCount = 0;
+
+    for (const cntId of country_ids) {
+      const existing = queryOne('SELECT id FROM delegations WHERE committee_id = ? AND country_id = ?;', [committee_id, cntId]);
+      if (!existing) {
+        const id = 'del_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        runSql(
+          `INSERT INTO delegations (id, committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes, created_at)
+           VALUES (?, ?, ?, '', '', '', '', 'available', '', ?)`,
+          [id, committee_id, cntId, now]
+        );
+        createdCount++;
+      }
+    }
+
+    res.json({ success: true, message: `Se generaron ${createdCount} cupos de delegaciones para la comisión.` });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al generar cupos', details: err.message });
+  }
+});
+
+// Registrations CRUD
+apiRouter.get('/admin/registrations', authMiddleware, (req, res) => {
+  const list = queryAll('SELECT * FROM registrations ORDER BY created_at DESC;');
+  res.json(list);
+});
+
+apiRouter.put('/admin/registrations/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, assigned_committee_id, assigned_country_id, notes } = req.body;
+
+    runSql(
+      `UPDATE registrations SET
+        status = ?, assigned_committee_id = ?, assigned_country_id = ?, notes = ?
+       WHERE id = ?`,
+      [status, assigned_committee_id || '', assigned_country_id || '', notes || '', id]
+    );
+
+    // If status is 'assigned' and committee & country are set, sync with delegations table!
+    if (status === 'assigned' && assigned_committee_id && assigned_country_id) {
+      const reg = queryOne<any>('SELECT * FROM registrations WHERE id = ?;', [id]);
+      if (reg) {
+        // check if delegation slot exists
+        const existingDel = queryOne<any>(
+          'SELECT * FROM delegations WHERE committee_id = ? AND country_id = ?;',
+          [assigned_committee_id, assigned_country_id]
+        );
+
+        if (existingDel) {
+          runSql(
+            `UPDATE delegations SET
+              delegate_name = ?, delegate_school = ?, delegate_email = ?, delegate_phone = ?, status = 'assigned'
+             WHERE id = ?`,
+            [reg.full_name, reg.school, reg.email, reg.phone, existingDel.id]
+          );
+        } else {
+          const newDelId = 'del_' + Date.now();
+          runSql(
+            `INSERT INTO delegations (id, committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'assigned', 'Asignado desde inscripción', ?)`,
+            [newDelId, assigned_committee_id, assigned_country_id, reg.full_name, reg.school, reg.email, reg.phone, new Date().toISOString()]
+          );
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Estado de inscripción actualizado.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar inscripción', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/registrations/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM registrations WHERE id = ?;', [id]);
+    res.json({ success: true, message: 'Inscripción eliminada.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar inscripción', details: err.message });
+  }
+});
+
+// About Sections CRUD
+apiRouter.get('/admin/about', authMiddleware, (req, res) => {
+  const sections = queryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
+  res.json(sections);
+});
+
+apiRouter.post('/admin/about', authMiddleware, canEditInstitutionalContent, (req, res) => {
+  try {
+    const { section_key, title, subtitle, content, icon, sort_order, is_active } = req.body;
+    if (!title || !content) {
+      return res.status(400).json({ error: 'El título y el contenido son obligatorios.' });
+    }
+    const id = 'abt_' + Date.now();
+    const finalKey = section_key ? section_key.trim().toLowerCase().replace(/\s+/g, '_') : id;
+    const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : 1;
+
+    runSql(
+      `INSERT INTO about_sections (id, section_key, title, subtitle, content, icon, sort_order, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, finalKey, title.trim(), subtitle || '', content, icon || 'Globe', Number(sort_order) || 0, activeVal]
+    );
+    res.status(201).json({ success: true, id, message: 'Sección institucional creada exitosamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear sección institucional', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/about/:id', authMiddleware, canEditInstitutionalContent, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, subtitle, content, icon, sort_order, is_active } = req.body;
+
+    const existing = queryOne<any>('SELECT * FROM about_sections WHERE id = ?;', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Sección no encontrada.' });
+    }
+
+    const updatedTitle = title !== undefined ? title.trim() : existing.title;
+    const updatedSubtitle = subtitle !== undefined ? subtitle : (existing.subtitle || '');
+    const updatedContent = content !== undefined ? content : existing.content;
+    const updatedIcon = icon !== undefined ? icon : (existing.icon || 'Globe');
+    const updatedSortOrder = sort_order !== undefined ? Number(sort_order) : existing.sort_order;
+    const updatedIsActive = is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active;
+
+    runSql(
+      `UPDATE about_sections SET title = ?, subtitle = ?, content = ?, icon = ?, sort_order = ?, is_active = ?
+       WHERE id = ?`,
+      [updatedTitle, updatedSubtitle, updatedContent, updatedIcon, updatedSortOrder, updatedIsActive, id]
+    );
+    res.json({ success: true, message: 'Sección actualizada correctamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar sección', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/about/:id', authMiddleware, canEditInstitutionalContent, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM about_sections WHERE id = ?;', [id]);
+    res.json({ success: true, message: 'Sección eliminada.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar sección', details: err.message });
+  }
+});
+
+apiRouter.post('/admin/about/reset-defaults', authMiddleware, canEditInstitutionalContent, (req, res) => {
+  try {
+    resetDefaultAboutSections();
+    const sections = queryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
+    res.json({
+      success: true,
+      message: 'Se han restablecido con éxito los 6 textos institucionales oficiales del BIMUN.',
+      sections,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al restablecer secciones institucionales', details: err.message });
+  }
+});
+
+// Schedule CRUD
+apiRouter.get('/admin/schedule', authMiddleware, (req, res) => {
+  const items = queryAll('SELECT * FROM schedule ORDER BY date ASC, sort_order ASC;');
+  res.json(items);
+});
+
+apiRouter.post('/admin/schedule', authMiddleware, (req, res) => {
+  try {
+    const { day_label, date, time_start, time_end, activity, description, location, audience, sort_order } = req.body;
+    const id = 'sch_' + Date.now();
+    runSql(
+      `INSERT INTO schedule (id, day_label, date, time_start, time_end, activity, description, location, audience, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, day_label, date, time_start, time_end, activity, description || '', location || '', audience || 'Todos', sort_order || 0]
+    );
+    res.status(201).json({ success: true, id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear evento del cronograma', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/schedule/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { day_label, date, time_start, time_end, activity, description, location, audience, sort_order } = req.body;
+    runSql(
+      `UPDATE schedule SET day_label = ?, date = ?, time_start = ?, time_end = ?, activity = ?, description = ?, location = ?, audience = ?, sort_order = ?
+       WHERE id = ?`,
+      [day_label, date, time_start, time_end, activity, description, location, audience, sort_order, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar evento', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/schedule/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM schedule WHERE id = ?;', [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar evento', details: err.message });
+  }
+});
+
+// Documents CRUD
+apiRouter.get('/admin/documents', authMiddleware, (req, res) => {
+  const docs = queryAll('SELECT * FROM documents ORDER BY sort_order ASC;');
+  res.json(docs);
+});
+
+apiRouter.post('/admin/documents', authMiddleware, (req, res) => {
+  try {
+    const { title, category, file_url, description, file_size, is_featured, sort_order } = req.body;
+    const id = 'doc_' + Date.now();
+    const now = new Date().toISOString();
+    runSql(
+      `INSERT INTO documents (id, title, category, file_url, description, file_size, is_featured, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, title, category || 'General', file_url || '#', description || '', file_size || '', is_featured ? 1 : 0, sort_order || 0, now]
+    );
+    res.status(201).json({ success: true, id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear documento', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/documents/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, category, file_url, description, file_size, is_featured, sort_order } = req.body;
+    runSql(
+      `UPDATE documents SET title = ?, category = ?, file_url = ?, description = ?, file_size = ?, is_featured = ?, sort_order = ?
+       WHERE id = ?`,
+      [title, category, file_url, description, file_size, is_featured ? 1 : 0, sort_order, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar documento', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/documents/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM documents WHERE id = ?;', [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar documento', details: err.message });
+  }
+});
+
+// Gallery CRUD & Categories
+apiRouter.get('/admin/gallery/categories', authMiddleware, (req, res) => {
+  try {
+    const row = queryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+    let categories: string[] = [];
+    if (row && row.value) {
+      try {
+        categories = JSON.parse(row.value);
+      } catch {
+        categories = [];
+      }
+    }
+    if (!categories || categories.length === 0) {
+      categories = ['Debate', 'Protocolo', 'Negociación', 'Crisis', 'Premiación', 'Campus', 'Social', 'Inauguración', 'Clausura'];
+    }
+
+    // Also collect counts per category and include any category present in existing photos
+    const counts = queryAll<{ category: string; count: number }>(
+      'SELECT category, COUNT(*) as count FROM gallery GROUP BY category;'
+    );
+    const categoryCounts: Record<string, number> = {};
+    for (const c of counts) {
+      if (c.category) {
+        categoryCounts[c.category] = c.count;
+        if (!categories.includes(c.category)) {
+          categories.push(c.category);
+        }
+      }
+    }
+
+    res.json({ categories, categoryCounts });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener categorías de la galería', details: err.message });
+  }
+});
+
+apiRouter.post('/admin/gallery/categories', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para modificar categorías de la galería.' });
+    }
+
+    const { categories, renameFrom, renameTo, deleteCategory, reassignTo } = req.body;
+    if (!Array.isArray(categories) || categories.length === 0) {
+      return res.status(400).json({ error: 'Debe proporcionar una lista válida de categorías.' });
+    }
+
+    const cleanedCategories = Array.from(
+      new Set(
+        categories
+          .map((c: string) => (typeof c === 'string' ? c.trim() : ''))
+          .filter(Boolean)
+      )
+    );
+
+    // Handle renaming category across existing photos
+    if (renameFrom && renameTo && renameFrom.trim() !== renameTo.trim()) {
+      runSql('UPDATE gallery SET category = ? WHERE category = ?;', [renameTo.trim(), renameFrom.trim()]);
+    }
+
+    // Handle deleting category and reassigning photos
+    if (deleteCategory) {
+      const fallbackTarget = reassignTo ? reassignTo.trim() : (cleanedCategories[0] || 'Debate');
+      runSql('UPDATE gallery SET category = ? WHERE category = ?;', [fallbackTarget, deleteCategory.trim()]);
+    }
+
+    const now = new Date().toISOString();
+    runSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+      'gallery_categories',
+      JSON.stringify(cleanedCategories),
+      now,
+    ]);
+
+    const counts = queryAll<{ category: string; count: number }>(
+      'SELECT category, COUNT(*) as count FROM gallery GROUP BY category;'
+    );
+    const categoryCounts: Record<string, number> = {};
+    for (const c of counts) {
+      if (c.category) {
+        categoryCounts[c.category] = c.count;
+      }
+    }
+
+    res.json({ success: true, categories: cleanedCategories, categoryCounts });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar categorías', details: err.message });
+  }
+});
+
+apiRouter.get('/admin/gallery', authMiddleware, (req, res) => {
+  const items = queryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
+  res.json(items);
+});
+
+apiRouter.post('/admin/gallery', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para agregar fotografías.' });
+    }
+
+    const { title, caption, image_url, category, edition, sort_order } = req.body;
+    if (!image_url) {
+      return res.status(400).json({ error: 'La URL o archivo de imagen es obligatorio.' });
+    }
+
+    const id = 'gal_' + Date.now();
+    const now = new Date().toISOString();
+    const finalCategory = (category && category.trim()) || 'Debate';
+
+    runSql(
+      `INSERT INTO gallery (id, title, caption, image_url, category, edition, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, title || 'Fotografía BIMUN', caption || '', image_url, finalCategory, edition || 'BIMUN XXVII', sort_order || 0, now]
+    );
+
+    // Auto-register category in settings if new
+    try {
+      const catRow = queryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+      if (catRow && catRow.value) {
+        const cats = JSON.parse(catRow.value);
+        if (Array.isArray(cats) && !cats.includes(finalCategory)) {
+          cats.push(finalCategory);
+          runSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+            'gallery_categories',
+            JSON.stringify(cats),
+            now,
+          ]);
+        }
+      }
+    } catch {}
+
+    res.status(201).json({ success: true, id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al agregar foto', details: err.message });
+  }
+});
+
+// Batch photo upload endpoint
+apiRouter.post('/admin/gallery/batch', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para subir fotografías en lote.' });
+    }
+
+    const { photos } = req.body;
+    if (!Array.isArray(photos) || photos.length === 0) {
+      return res.status(400).json({ error: 'Debe proporcionar al menos una fotografía para subir.' });
+    }
+
+    const now = new Date().toISOString();
+    const insertedIds: string[] = [];
+    const usedCategories = new Set<string>();
+
+    for (let i = 0; i < photos.length; i++) {
+      const p = photos[i];
+      if (!p || !p.image_url) continue;
+
+      const id = 'gal_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + i;
+      const title = (p.title && p.title.trim()) || `Fotografía BIMUN ${i + 1}`;
+      const caption = (p.caption && p.caption.trim()) || '';
+      const category = (p.category && p.category.trim()) || 'Debate';
+      const edition = (p.edition && p.edition.trim()) || 'BIMUN XXVII';
+      const sort_order = Number(p.sort_order ?? i);
+
+      usedCategories.add(category);
+
+      runSql(
+        `INSERT INTO gallery (id, title, caption, image_url, category, edition, sort_order, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, title, caption, p.image_url, category, edition, sort_order, now]
+      );
+      insertedIds.push(id);
+    }
+
+    // Auto-register new categories in settings
+    try {
+      const catRow = queryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+      let currentCategories: string[] = [];
+      if (catRow && catRow.value) {
+        try {
+          currentCategories = JSON.parse(catRow.value);
+        } catch {
+          currentCategories = [];
+        }
+      }
+      let changed = false;
+      for (const cat of usedCategories) {
+        if (cat && !currentCategories.includes(cat)) {
+          currentCategories.push(cat);
+          changed = true;
+        }
+      }
+      if (changed) {
+        runSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+          'gallery_categories',
+          JSON.stringify(currentCategories),
+          now,
+        ]);
+      }
+    } catch {}
+
+    res.status(201).json({
+      success: true,
+      count: insertedIds.length,
+      ids: insertedIds,
+      message: `Se agregaron exitosamente ${insertedIds.length} fotografías a la galería.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al procesar subida masiva de fotos', details: err.message });
+  }
+});
+
+// Batch delete photos
+apiRouter.post('/admin/gallery/batch-delete', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para eliminar fotografías.' });
+    }
+
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Debe especificar los identificadores de fotos a eliminar.' });
+    }
+
+    for (const id of ids) {
+      runSql('DELETE FROM gallery WHERE id = ?;', [id]);
+    }
+
+    res.json({ success: true, count: ids.length });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar fotografías seleccionadas', details: err.message });
+  }
+});
+
+// Reset gallery to default demo photos
+apiRouter.post('/admin/gallery/reset-defaults', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para restaurar la galería.' });
+    }
+
+    const result = resetDefaultGallery();
+    res.json({ success: true, count: result.itemsCount, message: 'Galería restaurada con éxito.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al restaurar galería predeterminada', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/gallery/:id', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para actualizar fotografías.' });
+    }
+
+    const { id } = req.params;
+    const { title, caption, image_url, category, edition, sort_order } = req.body;
+    runSql(
+      `UPDATE gallery SET title = ?, caption = ?, image_url = ?, category = ?, edition = ?, sort_order = ?
+       WHERE id = ?`,
+      [title, caption, image_url, category, edition, sort_order, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar foto', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/gallery/:id', authMiddleware, (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para eliminar fotografías.' });
+    }
+
+    const { id } = req.params;
+    runSql('DELETE FROM gallery WHERE id = ?;', [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar foto', details: err.message });
+  }
+});
+
+// Organizing Team CRUD
+apiRouter.get('/admin/team', authMiddleware, (req, res) => {
+  const team = queryAll('SELECT * FROM organizing_team ORDER BY sort_order ASC;');
+  res.json(team);
+});
+
+apiRouter.post('/admin/team', authMiddleware, (req, res) => {
+  try {
+    const { name, role, category, photo_url, bio, email, sort_order } = req.body;
+    const id = 'tm_' + Date.now();
+    runSql(
+      `INSERT INTO organizing_team (id, name, role, category, photo_url, bio, email, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, role, category || 'Secretaría', photo_url || '', bio || '', email || '', sort_order || 0]
+    );
+    res.status(201).json({ success: true, id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al agregar miembro del comité', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/team/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, role, category, photo_url, bio, email, sort_order } = req.body;
+    runSql(
+      `UPDATE organizing_team SET name = ?, role = ?, category = ?, photo_url = ?, bio = ?, email = ?, sort_order = ?
+       WHERE id = ?`,
+      [name, role, category, photo_url, bio, email, sort_order, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar miembro', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/team/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM organizing_team WHERE id = ?;', [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar miembro', details: err.message });
+  }
+});
+
+// News CRUD
+apiRouter.get('/admin/news', authMiddleware, (req, res) => {
+  const news = queryAll('SELECT * FROM news ORDER BY publish_date DESC;');
+  res.json(news);
+});
+
+apiRouter.post('/admin/news', authMiddleware, (req, res) => {
+  try {
+    const { title, slug, excerpt, content, image_url, category, publish_date, is_published } = req.body;
+    const id = 'nw_' + Date.now();
+    const cleanSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    runSql(
+      `INSERT INTO news (id, title, slug, excerpt, content, image_url, category, publish_date, is_published)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, title, cleanSlug, excerpt || '', content, image_url || '', category || 'General', publish_date || new Date().toISOString().split('T')[0], is_published ? 1 : 0]
+    );
+    res.status(201).json({ success: true, id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al publicar noticia', details: err.message });
+  }
+});
+
+apiRouter.put('/admin/news/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, slug, excerpt, content, image_url, category, publish_date, is_published } = req.body;
+    runSql(
+      `UPDATE news SET title = ?, slug = ?, excerpt = ?, content = ?, image_url = ?, category = ?, publish_date = ?, is_published = ?
+       WHERE id = ?`,
+      [title, slug, excerpt, content, image_url, category, publish_date, is_published ? 1 : 0, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar noticia', details: err.message });
+  }
+});
+
+apiRouter.delete('/admin/news/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    runSql('DELETE FROM news WHERE id = ?;', [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar noticia', details: err.message });
+  }
+});
+
+// Full Relational Export for Backup or Migration to PostgreSQL / MySQL
+apiRouter.get('/admin/export-database', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    await getDb();
+    const backup = {
+      version: '1.0.0',
+      exported_at: new Date().toISOString(),
+      target_compatibilities: ['SQLite', 'PostgreSQL', 'MySQL'],
+      tables: {
+        settings: queryAll('SELECT * FROM settings;'),
+        about_sections: queryAll('SELECT * FROM about_sections;'),
+        committees: queryAll('SELECT * FROM committees;'),
+        countries: queryAll('SELECT * FROM countries;'),
+        delegations: queryAll('SELECT * FROM delegations;'),
+        schedule: queryAll('SELECT * FROM schedule;'),
+        documents: queryAll('SELECT * FROM documents;'),
+        gallery: queryAll('SELECT * FROM gallery;'),
+        organizing_team: queryAll('SELECT * FROM organizing_team;'),
+        news: queryAll('SELECT * FROM news;'),
+        registrations: queryAll('SELECT * FROM registrations;'),
+      }
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="bimun_backup_' + Date.now() + '.json"');
+    res.json(backup);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al exportar base de datos', details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// DYNAMIC DATABASE CONFIGURATION & MANAGEMENT (PostgreSQL / MySQL / SQLite)
+// -------------------------------------------------------------
+import {
+  getDatabaseStatus,
+  getCurrentConfigSafe,
+  testConnection,
+  switchDatabaseEngine,
+  migrateCurrentDataToTarget,
+} from './dbManager.ts';
+
+// Get current database status and configuration
+apiRouter.get('/admin/db-config', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const status = getDatabaseStatus();
+    const config = getCurrentConfigSafe();
+    res.json({ status, config });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener estado de base de datos', details: err.message });
+  }
+});
+
+// Test connection to PostgreSQL or MySQL without applying
+apiRouter.post('/admin/db-test', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const { type, host, port, database, user, password, ssl, connectionString } = req.body;
+    if (!type) {
+      return res.status(400).json({ error: 'Tipo de base de datos requerido.' });
+    }
+
+    const result = await testConnection({
+      type,
+      host,
+      port: port ? Number(port) : undefined,
+      database,
+      user,
+      password,
+      ssl: Boolean(ssl),
+      connectionString,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: `Error probando conexión: ${err.message}` });
+  }
+});
+
+// Switch active database engine (SQLite, PostgreSQL or MySQL)
+apiRouter.post('/admin/db-switch', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const { type, host, port, database, user, password, ssl, connectionString } = req.body;
+    if (!type || !['sqlite', 'postgres', 'mysql'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de base de datos inválido. Use sqlite, postgres o mysql.' });
+    }
+
+    const result = await switchDatabaseEngine({
+      type,
+      host,
+      port: port ? Number(port) : undefined,
+      database,
+      user,
+      password,
+      ssl: Boolean(ssl),
+      connectionString,
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        status: getDatabaseStatus(),
+        config: getCurrentConfigSafe(),
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        status: getDatabaseStatus(),
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: `Error cambiando base de datos: ${err.message}` });
+  }
+});
+
+// Migrate current data to target database (PostgreSQL or MySQL)
+apiRouter.post('/admin/db-migrate', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const { type, host, port, database, user, password, ssl, connectionString } = req.body;
+    if (!type || (type !== 'postgres' && type !== 'mysql')) {
+      return res.status(400).json({ error: 'Solo se puede migrar hacia PostgreSQL o MySQL.' });
+    }
+
+    const result = await migrateCurrentDataToTarget({
+      type,
+      host,
+      port: port ? Number(port) : undefined,
+      database,
+      user,
+      password,
+      ssl: Boolean(ssl),
+      connectionString,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: `Error durante migración: ${err.message}` });
+  }
+});
+
+// Admin-only: Clear test data (registrations, delegations, committees, countries, schedule, docs, gallery, news, team, about)
+apiRouter.post('/admin/system/clear-test-data', authMiddleware, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo el perfil administrador puede limpiar los datos del sistema.' });
+    }
+
+    const result = clearDemoData();
+    res.json({
+      success: true,
+      message: 'Todos los datos de prueba han sido eliminados satisfactoriamente. Tu configuración institucional y usuarios se mantienen intactos.',
+      clearedCounts: result.clearedCounts,
+    });
+  } catch (err: any) {
+    console.error('Error clearing test data:', err);
+    res.status(500).json({ error: 'Error al limpiar datos de prueba', details: err.message });
+  }
+});
+
+// Admin-only: Reload initial seed demonstration data
+apiRouter.post('/admin/system/load-seed-data', authMiddleware, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo el perfil administrador puede recargar los datos de prueba.' });
+    }
+
+    const result = reloadDemoData();
+    res.json({
+      success: true,
+      message: 'Datos de prueba de BIMUN recargados exitosamente (comisiones, países, cronograma, equipo, documentos, noticias e inscripciones de muestra).',
+    });
+  } catch (err: any) {
+    console.error('Error loading seed data:', err);
+    res.status(500).json({ error: 'Error al recargar datos de prueba', details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// USER MANAGEMENT & PROFILES (ADMIN ONLY)
+// -------------------------------------------------------------
+
+// List all system users
+apiRouter.get('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const users = queryAll<any>('SELECT id, username, display_name, role, created_at FROM users ORDER BY created_at ASC;');
+    res.json({ success: true, users });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener usuarios', details: err.message });
+  }
+});
+
+// Create new user
+apiRouter.post('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const { username, display_name, password, role } = req.body;
+    if (!username || !display_name || !password) {
+      return res.status(400).json({ error: 'Nombre de usuario, nombre visible y contraseña son requeridos.' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+    const existing = queryOne('SELECT id FROM users WHERE username = ?;', [cleanUsername]);
+    if (existing) {
+      return res.status(409).json({ error: 'El nombre de usuario ya está registrado en el sistema.' });
+    }
+
+    const validRoles = ['admin', 'superadmin', 'coordinador', 'academico', 'prensa'];
+    const assignedRole = validRoles.includes(role) ? role : 'coordinador';
+
+    const salt = bcrypt.genSaltSync(10);
+    const password_hash = bcrypt.hashSync(password, salt);
+    const id = `usr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const now = new Date().toISOString();
+
+    runSql(
+      'INSERT INTO users (id, username, password_hash, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?);',
+      [id, cleanUsername, password_hash, display_name.trim(), assignedRole, now]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Usuario creado exitosamente.',
+      user: { id, username: cleanUsername, display_name: display_name.trim(), role: assignedRole, created_at: now },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear usuario', details: err.message });
+  }
+});
+
+// Update user details (name, role)
+apiRouter.put('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { display_name, role } = req.body;
+    const currentUser = (req as any).user;
+
+    const existing = queryOne<any>('SELECT id, role FROM users WHERE id = ?;', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    // Safety: don't allow removing own admin role
+    if (id === currentUser.id && role && role !== 'admin' && role !== 'superadmin') {
+      return res.status(400).json({ error: 'No puedes degradar tu propio rol de administrador.' });
+    }
+
+    const validRoles = ['admin', 'superadmin', 'coordinador', 'academico', 'prensa'];
+    const updatedRole = role && validRoles.includes(role) ? role : existing.role;
+    const updatedName = display_name ? display_name.trim() : undefined;
+
+    if (updatedName) {
+      runSql('UPDATE users SET display_name = ?, role = ? WHERE id = ?;', [updatedName, updatedRole, id]);
+    } else {
+      runSql('UPDATE users SET role = ? WHERE id = ?;', [updatedRole, id]);
+    }
+
+    res.json({ success: true, message: 'Usuario actualizado correctamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar usuario', details: err.message });
+  }
+});
+
+// Reset user password (admin reset)
+apiRouter.post('/admin/users/:id/reset-password', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_password } = req.body;
+
+    if (!new_password || new_password.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    const existing = queryOne('SELECT id FROM users WHERE id = ?;', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(new_password, salt);
+    runSql('UPDATE users SET password_hash = ? WHERE id = ?;', [hash, id]);
+
+    res.json({ success: true, message: 'Contraseña restablecida exitosamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al restablecer contraseña', details: err.message });
+  }
+});
+
+// Delete user
+apiRouter.delete('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = (req as any).user;
+
+    if (id === currentUser.id) {
+      return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta de usuario en sesión.' });
+    }
+
+    const existing = queryOne('SELECT id FROM users WHERE id = ?;', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    runSql('DELETE FROM users WHERE id = ?;', [id]);
+    res.json({ success: true, message: 'Usuario eliminado del sistema.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar usuario', details: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// SMTP & GOOGLE WORKSPACE EMAIL ENDPOINTS (ADMIN ONLY)
+// -------------------------------------------------------------
+
+// Get SMTP Configuration (safe view without exposing raw password)
+apiRouter.get('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const config = getSmtpConfig();
+    res.json({
+      success: true,
+      config: {
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        user: config.user,
+        has_password: Boolean(config.password && config.password.length > 0),
+        from_name: config.from_name,
+        reply_to: config.reply_to || '',
+        is_enabled: config.is_enabled,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener configuración SMTP', details: err.message });
+  }
+});
+
+// Update SMTP Configuration
+apiRouter.put('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  try {
+    const { host, port, secure, user, password, from_name, reply_to, is_enabled } = req.body;
+
+    saveSmtpConfig({
+      host: host ? host.trim() : 'smtp.gmail.com',
+      port: port ? Number(port) : 465,
+      secure: secure !== undefined ? Boolean(secure) : true,
+      user: user ? user.trim() : '',
+      password: password !== undefined ? password : '',
+      from_name: from_name ? from_name.trim() : 'BIMUN Oficial',
+      reply_to: reply_to ? reply_to.trim() : '',
+      is_enabled: is_enabled !== undefined ? Boolean(is_enabled) : false,
+    });
+
+    res.json({ success: true, message: 'Configuración SMTP guardada correctamente.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al guardar configuración SMTP', details: err.message });
+  }
+});
+
+// Verify connection with SMTP server
+apiRouter.post('/admin/smtp/verify', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const { host, port, secure, user, password } = req.body;
+    let customConfig = undefined;
+    if (user && password) {
+      customConfig = {
+        host: host || 'smtp.gmail.com',
+        port: port ? Number(port) : 465,
+        secure: secure !== undefined ? Boolean(secure) : true,
+        user: user.trim(),
+        password: password.trim().replace(/\s+/g, ''),
+        from_name: 'BIMUN Test',
+        is_enabled: true,
+      };
+    }
+
+    const result = await verifySmtpConnection(customConfig);
+    if (result.success) {
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(400).json({ success: false, error: result.message });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Send test email
+apiRouter.post('/admin/smtp/send-test', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const { target_email, host, port, secure, user, password, from_name } = req.body;
+    if (!target_email) {
+      return res.status(400).json({ error: 'Se requiere una dirección de correo destinataria para la prueba.' });
+    }
+
+    let customConfig = undefined;
+    if (user && password) {
+      customConfig = {
+        host: host || 'smtp.gmail.com',
+        port: port ? Number(port) : 465,
+        secure: secure !== undefined ? Boolean(secure) : true,
+        user: user.trim(),
+        password: password.trim().replace(/\s+/g, ''),
+        from_name: from_name || 'BIMUN Oficial',
+        is_enabled: true,
+      };
+    }
+
+    const result = await sendTestEmail(target_email.trim(), customConfig);
+    if (result.success) {
+      res.json({ success: true, message: result.message, messageId: result.messageId });
+    } else {
+      res.status(400).json({ success: false, error: result.message });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+

@@ -1,0 +1,6 @@
+{
+  "name": "BIMUN - Colegio Bilingüe de Valledupar",
+  "description": "Plataforma oficial y CMS del Modelo de Naciones Unidas de la Fundación Colegio Bilingüe de Valledupar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
