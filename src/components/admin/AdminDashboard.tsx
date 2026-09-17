@@ -7,6 +7,7 @@ import {
   CheckSquare, Square, Clock
 } from 'lucide-react';
 import { ImageUploadField } from '../common/ImageUploadField.tsx';
+import { VideoUploadField } from '../common/VideoUploadField.tsx';
 import { DatabaseSettingsSection } from './DatabaseSettingsSection.tsx';
 import { SmtpSettingsSection } from './SmtpSettingsSection.tsx';
 import { UsersManagementSection } from './UsersManagementSection.tsx';
@@ -1145,13 +1146,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
 
                     <div className="space-y-1 sm:col-span-2">
-                      <label className="text-xs text-slate-400">URL Video de Fondo (Opcional MP4)</label>
-                      <input
-                        type="text"
+                      <VideoUploadField
+                        label="Video de Fondo de la Portada (Hero Video)"
                         value={settings.hero_video_url || ''}
-                        onChange={(e) => setSettings({ ...settings, hero_video_url: e.target.value })}
-                        placeholder="https://.../video.mp4"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                        onChange={(val) => setSettings({ ...settings, hero_video_url: val })}
+                        helperText="Video corto en loop para el fondo (se reproduce en silencio automáticamente). Priorizando optimización, se sugiere un video ligero."
+                        maxSizeMb={5}
                       />
                     </div>
 
