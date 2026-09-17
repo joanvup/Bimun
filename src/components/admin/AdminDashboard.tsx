@@ -1172,7 +1172,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">
                     Datos Institucionales y Contacto
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs text-slate-400">Dirección Física</label>
+                      <input
+                        type="text"
+                        value={settings.contact_address || ''}
+                        onChange={(e) => setSettings({ ...settings, contact_address: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                        placeholder="Ej: Calle 16 # 19E-45"
+                      />
+                    </div>
                     <div className="space-y-1">
                       <label className="text-xs text-slate-400">Correo Contacto</label>
                       <input
