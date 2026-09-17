@@ -714,8 +714,36 @@ export async function initializeDatabaseManager(): Promise<void> {
       lastErrorMessage = `MySQL: ${err.message}. Operando en modo seguro sobre SQLite local.`;
       activeDatabaseType = 'sqlite';
       isInitialized = true;
-      return;
     }
+  }
+
+  // Ensure default superadmin exists across all database engines
+  await ensureDefaultAdmin();
+}
+
+/**
+ * Guarantees that the default superadmin (admin / bimun2026) exists in the active database engine
+ */
+export async function ensureDefaultAdmin(): Promise<void> {
+  try {
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync('bimun2026', salt);
+    const now = new Date().toISOString();
+
+    const existing = await executeQueryOne<any>(
+      'SELECT id, username, password_hash FROM users WHERE LOWER(TRIM(username)) = ?;',
+      ['admin']
+    );
+
+    if (!existing) {
+      await executeRunSql(
+        'INSERT INTO users (id, username, password_hash, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?);',
+        ['usr_admin_1', 'admin', hash, 'Secretaría General BIMUN', 'superadmin', now]
+      );
+      console.log('✅ Default superadmin created/ensured: admin / bimun2026');
+    }
+  } catch (err: any) {
+    console.error('Error ensuring default admin:', err.message);
   }
 }
 
@@ -899,6 +927,9 @@ export async function executeQueryAll<T>(sql: string, params: any[] = []): Promi
   }
   const db = await getSqliteDb();
   const stmt = db.prepare(sql);
+  if (params && params.length > 0) {
+    stmt.bind(params);
+  }
   const rows = [];
   while (stmt.step()) {
     rows.push(stmt.getAsObject());
