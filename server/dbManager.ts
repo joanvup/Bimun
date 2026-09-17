@@ -606,7 +606,7 @@ export async function testConnection(config: DatabaseConnectionConfig): Promise<
     let testPool: MySqlPool | null = null;
     try {
       const poolOptions: PoolOptions = config.connectionString
-        ? { uri: config.connectionString, connectTimeout: 5000 }
+        ? { uri: config.connectionString, connectTimeout: 5000, ssl: { rejectUnauthorized: false } }
         : {
             host: config.host || 'localhost',
             port: Number(config.port) || 3306,
@@ -778,7 +778,7 @@ export async function switchDatabaseEngine(config: DatabaseConnectionConfig): Pr
   if (config.type === 'mysql') {
     try {
       const poolOptions: PoolOptions = config.connectionString
-        ? { uri: config.connectionString }
+        ? { uri: config.connectionString, ssl: { rejectUnauthorized: false } }
         : {
             host: config.host,
             port: Number(config.port) || 3306,
@@ -973,16 +973,15 @@ export async function migrateCurrentDataToTarget(targetConfig: DatabaseConnectio
 
           // UPSERT pattern for Postgres
           const primaryKey = keys.includes('key') ? 'key' : 'id';
-          const updateSets = keys
-            .filter((k) => k !== primaryKey)
-            .map((k) => `"${k}" = EXCLUDED."${k}"`)
-            .join(', ');
-
+                    const updateKeys = keys.filter((k) => k !== 'id' && k !== 'key');
+          const updateSets = updateKeys.map((k) => `\`${k}\` = ?`).join(', ');
+          const updateValues = updateKeys.map((k) => row[k]);
+          
           const upsertSql = updateSets
-            ? `INSERT INTO ${table} (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT ("${primaryKey}") DO UPDATE SET ${updateSets};`
-            : `INSERT INTO ${table} (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT ("${primaryKey}") DO NOTHING;`;
+            ? `INSERT INTO \`${table}\` (${quotedKeys}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updateSets};`
+            : `INSERT INTO \`${table}\` (${quotedKeys}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE \`${keys[0]}\` = \`${keys[0]}\`;`;
 
-          await targetPool.query(upsertSql, values);
+          await targetPool.query(upsertSql, [...values, ...updateValues]);
           rowsMigrated++;
         }
       }
@@ -1005,7 +1004,7 @@ export async function migrateCurrentDataToTarget(targetConfig: DatabaseConnectio
 
   if (targetConfig.type === 'mysql') {
     const poolOptions: PoolOptions = targetConfig.connectionString
-      ? { uri: targetConfig.connectionString }
+      ? { uri: targetConfig.connectionString, ssl: { rejectUnauthorized: false } }
       : {
           host: targetConfig.host,
           port: Number(targetConfig.port) || 3306,
@@ -1034,16 +1033,15 @@ export async function migrateCurrentDataToTarget(targetConfig: DatabaseConnectio
           const placeholders = keys.map(() => '?').join(', ');
           const quotedKeys = keys.map((k) => `\`${k}\``).join(', ');
 
-          const updateSets = keys
-            .filter((k) => k !== 'id' && k !== 'key')
-            .map((k) => `\`${k}\` = VALUES(\`${k}\`)`)
-            .join(', ');
-
+                    const updateKeys = keys.filter((k) => k !== 'id' && k !== 'key');
+          const updateSets = updateKeys.map((k) => `\`${k}\` = ?`).join(', ');
+          const updateValues = updateKeys.map((k) => row[k]);
+          
           const upsertSql = updateSets
             ? `INSERT INTO \`${table}\` (${quotedKeys}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updateSets};`
             : `INSERT INTO \`${table}\` (${quotedKeys}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE \`${keys[0]}\` = \`${keys[0]}\`;`;
 
-          await targetPool.query(upsertSql, values);
+          await targetPool.query(upsertSql, [...values, ...updateValues]);
           rowsMigrated++;
         }
       }

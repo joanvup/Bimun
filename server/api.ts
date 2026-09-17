@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { queryAll, queryOne, runSql, getDb, clearDemoData, reloadDemoData, resetDefaultAboutSections, resetDefaultGallery } from './db.ts';
+import { executeQueryAll, executeQueryOne, executeRunSql } from './dbManager.ts';
+import { getDb, clearDemoData, reloadDemoData, resetDefaultAboutSections, resetDefaultGallery } from './db.ts';
 import { getSmtpConfig, saveSmtpConfig, verifySmtpConnection, sendTestEmail } from './email.ts';
 import {
   SECURE_JWT_SECRET,
@@ -62,7 +63,7 @@ apiRouter.get('/public/data', async (req, res) => {
     await getDb();
 
     // Settings
-    const rawSettings = queryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
+    const rawSettings = await executeQueryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
     const settings: Record<string, any> = {};
     for (const s of rawSettings) {
       if (s.key === 'active_sections' || s.key === 'event_dates_iso' || s.key === 'gallery_categories') {
@@ -109,16 +110,16 @@ apiRouter.get('/public/data', async (req, res) => {
     }
 
     // Active About sections
-    const about = queryAll('SELECT * FROM about_sections WHERE is_active = 1 ORDER BY sort_order ASC;');
+    const about = await executeQueryAll('SELECT * FROM about_sections WHERE is_active = 1 ORDER BY sort_order ASC;');
 
     // Active Committees
-    const committees = queryAll('SELECT * FROM committees WHERE status != "archived" ORDER BY sort_order ASC;');
+    const committees = await executeQueryAll('SELECT * FROM committees WHERE status != "archived" ORDER BY sort_order ASC;');
 
     // Active Countries
-    const countries = queryAll('SELECT * FROM countries WHERE status = "active" ORDER BY name ASC;');
+    const countries = await executeQueryAll('SELECT * FROM countries WHERE status = "active" ORDER BY name ASC;');
 
     // Delegations with Committee and Country joins
-    const delegations = queryAll(`
+    const delegations = await executeQueryAll(`
       SELECT 
         d.id, d.committee_id, d.country_id, d.delegate_name, d.delegate_school, d.status,
         c.name as committee_name, c.abbreviation as committee_abbr, c.language as committee_language,
@@ -130,19 +131,19 @@ apiRouter.get('/public/data', async (req, res) => {
     `);
 
     // Schedule
-    const schedule = queryAll('SELECT * FROM schedule ORDER BY date ASC, sort_order ASC;');
+    const schedule = await executeQueryAll('SELECT * FROM schedule ORDER BY date ASC, sort_order ASC;');
 
     // Documents
-    const documents = queryAll('SELECT * FROM documents ORDER BY is_featured DESC, sort_order ASC;');
+    const documents = await executeQueryAll('SELECT * FROM documents ORDER BY is_featured DESC, sort_order ASC;');
 
     // Gallery
-    const gallery = queryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
+    const gallery = await executeQueryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
 
     // Organizing team
-    const team = queryAll('SELECT * FROM organizing_team ORDER BY sort_order ASC;');
+    const team = await executeQueryAll('SELECT * FROM organizing_team ORDER BY sort_order ASC;');
 
     // News
-    const news = queryAll('SELECT * FROM news WHERE is_published = 1 ORDER BY publish_date DESC;');
+    const news = await executeQueryAll('SELECT * FROM news WHERE is_published = 1 ORDER BY publish_date DESC;');
 
     // Filter settings through strict whitelist to guarantee zero leakage of sensitive keys (e.g. SMTP passwords)
     const sanitizedSettings = filterPublicSettings(settings);
@@ -193,7 +194,7 @@ apiRouter.post('/public/register', registerRateLimiter, async (req, res) => {
     const regId = 'reg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const now = new Date().toISOString();
 
-    runSql(
+    await executeRunSql(
       `INSERT INTO registrations (
         id, full_name, email, phone, school, delegation_type, grade,
         committee_preference_1, committee_preference_2, country_preference_1, country_preference_2,
@@ -242,7 +243,7 @@ apiRouter.post('/auth/login', loginRateLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
     }
 
-    const user = queryOne('SELECT * FROM users WHERE username = ?;', [username.trim()]);
+    const user = await executeQueryOne('SELECT * FROM users WHERE username = ?;', [username.trim()]);
     if (!user) {
       recordFailedLogin(req);
       return res.status(401).json({ error: 'Credenciales inválidas' });
@@ -279,15 +280,15 @@ apiRouter.post('/auth/login', loginRateLimiter, async (req, res) => {
   }
 });
 
-apiRouter.get('/auth/me', authMiddleware, (req, res) => {
+apiRouter.get('/auth/me', authMiddleware, async (req, res) => {
   res.json({ user: (req as any).user });
 });
 
 // Endpoint to audit default security state (checks if user is still using default credentials)
-apiRouter.get('/auth/security-audit', authMiddleware, (req, res) => {
+apiRouter.get('/auth/security-audit', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
-    const dbUser = queryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?;', [user.id]);
+    const dbUser = await executeQueryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?;', [user.id]);
     
     // Check if the current password is still the default 'bimun2026'
     const isUsingDefaultPassword = dbUser ? bcrypt.compareSync('bimun2026', dbUser.password_hash) : false;
@@ -307,7 +308,7 @@ apiRouter.get('/auth/security-audit', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.post('/auth/change-password', authMiddleware, (req, res) => {
+apiRouter.post('/auth/change-password', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     const { current_password, new_password } = req.body;
@@ -316,14 +317,14 @@ apiRouter.post('/auth/change-password', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres para producción.' });
     }
 
-    const dbUser = queryOne('SELECT * FROM users WHERE id = ?;', [user.id]);
+    const dbUser = await executeQueryOne('SELECT * FROM users WHERE id = ?;', [user.id]);
     if (!dbUser || !bcrypt.compareSync(current_password, dbUser.password_hash)) {
       return res.status(401).json({ error: 'La contraseña actual es incorrecta.' });
     }
 
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(new_password, salt);
-    runSql('UPDATE users SET password_hash = ? WHERE id = ?;', [hash, user.id]);
+    await executeRunSql('UPDATE users SET password_hash = ? WHERE id = ?;', [hash, user.id]);
 
     res.json({ success: true, message: 'Contraseña actualizada correctamente.' });
   } catch (err: any) {
@@ -336,16 +337,16 @@ apiRouter.post('/auth/change-password', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 
 // Dashboard statistics
-apiRouter.get('/admin/stats', authMiddleware, (req, res) => {
+apiRouter.get('/admin/stats', authMiddleware, async (req, res) => {
   try {
-    const comCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM committees;')?.count || 0;
-    const delTotal = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations;')?.count || 0;
-    const delAssigned = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations WHERE status = "assigned";')?.count || 0;
-    const regPending = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations WHERE status = "pending";')?.count || 0;
-    const regTotal = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations;')?.count || 0;
-    const cntCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM countries;')?.count || 0;
-    const docCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM documents;')?.count || 0;
-    const newsCount = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM news;')?.count || 0;
+    const comCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM committees;'))?.count || 0;
+    const delTotal = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations;'))?.count || 0;
+    const delAssigned = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations WHERE status = "assigned";'))?.count || 0;
+    const regPending = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations WHERE status = "pending";'))?.count || 0;
+    const regTotal = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations;'))?.count || 0;
+    const cntCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM countries;'))?.count || 0;
+    const docCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM documents;'))?.count || 0;
+    const newsCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM news;'))?.count || 0;
 
     res.json({
       committees_total: comCount,
@@ -364,8 +365,8 @@ apiRouter.get('/admin/stats', authMiddleware, (req, res) => {
 });
 
 // Settings CRUD
-apiRouter.get('/admin/settings', authMiddleware, (req, res) => {
-  const rows = queryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
+apiRouter.get('/admin/settings', authMiddleware, async (req, res) => {
+  const rows = await executeQueryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
   const settingsObj: Record<string, any> = {};
   for (const r of rows) {
     try {
@@ -394,14 +395,14 @@ apiRouter.get('/admin/settings', authMiddleware, (req, res) => {
   res.json(settingsObj);
 });
 
-apiRouter.put('/admin/settings', authMiddleware, (req, res) => {
+apiRouter.put('/admin/settings', authMiddleware, async (req, res) => {
   try {
     const updates: Record<string, any> = req.body;
     const now = new Date().toISOString();
 
     for (const [key, val] of Object.entries(updates)) {
       const valStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
-      runSql(
+      await executeRunSql(
         `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
         [key, valStr, now]
@@ -415,12 +416,12 @@ apiRouter.put('/admin/settings', authMiddleware, (req, res) => {
 });
 
 // Committees CRUD
-apiRouter.get('/admin/committees', authMiddleware, (req, res) => {
-  const committees = queryAll('SELECT * FROM committees ORDER BY sort_order ASC, name ASC;');
+apiRouter.get('/admin/committees', authMiddleware, async (req, res) => {
+  const committees = await executeQueryAll('SELECT * FROM committees ORDER BY sort_order ASC, name ASC;');
   res.json(committees);
 });
 
-apiRouter.post('/admin/committees', authMiddleware, (req, res) => {
+apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
   try {
     const {
       code,
@@ -447,7 +448,7 @@ apiRouter.post('/admin/committees', authMiddleware, (req, res) => {
     const id = 'com_' + Date.now();
     const now = new Date().toISOString();
 
-    runSql(
+    await executeRunSql(
       `INSERT INTO committees (
         id, code, name, abbreviation, description, image_url, language,
         topic_a, topic_b, topic_c, president_name, president_photo,
@@ -480,7 +481,7 @@ apiRouter.post('/admin/committees', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/committees/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/committees/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -501,7 +502,7 @@ apiRouter.put('/admin/committees/:id', authMiddleware, (req, res) => {
       sort_order,
     } = req.body;
 
-    runSql(
+    await executeRunSql(
       `UPDATE committees SET
         code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
         topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?, president_photo = ?,
@@ -534,10 +535,10 @@ apiRouter.put('/admin/committees/:id', authMiddleware, (req, res) => {
 });
 
 // Duplicate a committee
-apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, (req, res) => {
+apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const com = queryOne<any>('SELECT * FROM committees WHERE id = ?;', [id]);
+    const com = await executeQueryOne<any>('SELECT * FROM committees WHERE id = ?;', [id]);
     if (!com) return res.status(404).json({ error: 'Comisión no encontrada' });
 
     const newId = 'com_' + Date.now();
@@ -545,7 +546,7 @@ apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, (req, res) => 
     const newName = com.name + ' (Copia)';
     const now = new Date().toISOString();
 
-    runSql(
+    await executeRunSql(
       `INSERT INTO committees (
         id, code, name, abbreviation, description, image_url, language,
         topic_a, topic_b, topic_c, president_name, president_photo,
@@ -578,11 +579,11 @@ apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, (req, res) => 
   }
 });
 
-apiRouter.delete('/admin/committees/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/committees/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM delegations WHERE committee_id = ?;', [id]);
-    runSql('DELETE FROM committees WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM delegations WHERE committee_id = ?;', [id]);
+    await executeRunSql('DELETE FROM committees WHERE id = ?;', [id]);
     res.json({ success: true, message: 'Comisión eliminada con éxito.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar comisión', details: err.message });
@@ -590,12 +591,12 @@ apiRouter.delete('/admin/committees/:id', authMiddleware, (req, res) => {
 });
 
 // Countries CRUD
-apiRouter.get('/admin/countries', authMiddleware, (req, res) => {
-  const countries = queryAll('SELECT * FROM countries ORDER BY name ASC;');
+apiRouter.get('/admin/countries', authMiddleware, async (req, res) => {
+  const countries = await executeQueryAll('SELECT * FROM countries ORDER BY name ASC;');
   res.json(countries);
 });
 
-apiRouter.post('/admin/countries', authMiddleware, (req, res) => {
+apiRouter.post('/admin/countries', authMiddleware, async (req, res) => {
   try {
     const { name, official_name, code, flag_emoji, flag_url, additional_info, status } = req.body;
     if (!name || !code) {
@@ -603,7 +604,7 @@ apiRouter.post('/admin/countries', authMiddleware, (req, res) => {
     }
 
     const id = 'cnt_' + code.toLowerCase().replace(/[^a-z0-9]/g, '');
-    runSql(
+    await executeRunSql(
       `INSERT INTO countries (id, name, official_name, code, flag_emoji, flag_url, additional_info, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -624,12 +625,12 @@ apiRouter.post('/admin/countries', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/countries/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/countries/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, official_name, code, flag_emoji, flag_url, additional_info, status } = req.body;
 
-    runSql(
+    await executeRunSql(
       `UPDATE countries SET name = ?, official_name = ?, code = ?, flag_emoji = ?, flag_url = ?, additional_info = ?, status = ?
        WHERE id = ?`,
       [name, official_name, code, flag_emoji, flag_url, additional_info, status, id]
@@ -641,11 +642,11 @@ apiRouter.put('/admin/countries/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/countries/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/countries/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM delegations WHERE country_id = ?;', [id]);
-    runSql('DELETE FROM countries WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM delegations WHERE country_id = ?;', [id]);
+    await executeRunSql('DELETE FROM countries WHERE id = ?;', [id]);
     res.json({ success: true, message: 'País eliminado.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar país', details: err.message });
@@ -653,8 +654,8 @@ apiRouter.delete('/admin/countries/:id', authMiddleware, (req, res) => {
 });
 
 // Delegations CRUD (Relación Comisión <-> País <-> Delegado)
-apiRouter.get('/admin/delegations', authMiddleware, (req, res) => {
-  const delegations = queryAll(`
+apiRouter.get('/admin/delegations', authMiddleware, async (req, res) => {
+  const delegations = await executeQueryAll(`
     SELECT 
       d.*,
       c.name as committee_name, c.abbreviation as committee_abbr,
@@ -667,7 +668,7 @@ apiRouter.get('/admin/delegations', authMiddleware, (req, res) => {
   res.json(delegations);
 });
 
-apiRouter.post('/admin/delegations', authMiddleware, (req, res) => {
+apiRouter.post('/admin/delegations', authMiddleware, async (req, res) => {
   try {
     const { committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes } = req.body;
     if (!committee_id || !country_id) {
@@ -677,7 +678,7 @@ apiRouter.post('/admin/delegations', authMiddleware, (req, res) => {
     const id = 'del_' + Date.now();
     const now = new Date().toISOString();
 
-    runSql(
+    await executeRunSql(
       `INSERT INTO delegations (
         id, committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -701,12 +702,12 @@ apiRouter.post('/admin/delegations', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/delegations/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/delegations/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes } = req.body;
 
-    runSql(
+    await executeRunSql(
       `UPDATE delegations SET
         committee_id = ?, country_id = ?, delegate_name = ?, delegate_school = ?,
         delegate_email = ?, delegate_phone = ?, status = ?, notes = ?
@@ -730,10 +731,10 @@ apiRouter.put('/admin/delegations/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/delegations/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/delegations/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM delegations WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM delegations WHERE id = ?;', [id]);
     res.json({ success: true, message: 'Delegación eliminada.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar delegación', details: err.message });
@@ -741,7 +742,7 @@ apiRouter.delete('/admin/delegations/:id', authMiddleware, (req, res) => {
 });
 
 // Batch populate country slots for a committee
-apiRouter.post('/admin/delegations/batch-slots', authMiddleware, (req, res) => {
+apiRouter.post('/admin/delegations/batch-slots', authMiddleware, async (req, res) => {
   try {
     const { committee_id, country_ids } = req.body;
     if (!committee_id || !Array.isArray(country_ids) || country_ids.length === 0) {
@@ -752,10 +753,10 @@ apiRouter.post('/admin/delegations/batch-slots', authMiddleware, (req, res) => {
     let createdCount = 0;
 
     for (const cntId of country_ids) {
-      const existing = queryOne('SELECT id FROM delegations WHERE committee_id = ? AND country_id = ?;', [committee_id, cntId]);
+      const existing = await executeQueryOne('SELECT id FROM delegations WHERE committee_id = ? AND country_id = ?;', [committee_id, cntId]);
       if (!existing) {
         const id = 'del_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-        runSql(
+        await executeRunSql(
           `INSERT INTO delegations (id, committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes, created_at)
            VALUES (?, ?, ?, '', '', '', '', 'available', '', ?)`,
           [id, committee_id, cntId, now]
@@ -771,17 +772,17 @@ apiRouter.post('/admin/delegations/batch-slots', authMiddleware, (req, res) => {
 });
 
 // Registrations CRUD
-apiRouter.get('/admin/registrations', authMiddleware, (req, res) => {
-  const list = queryAll('SELECT * FROM registrations ORDER BY created_at DESC;');
+apiRouter.get('/admin/registrations', authMiddleware, async (req, res) => {
+  const list = await executeQueryAll('SELECT * FROM registrations ORDER BY created_at DESC;');
   res.json(list);
 });
 
-apiRouter.put('/admin/registrations/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/registrations/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, assigned_committee_id, assigned_country_id, notes } = req.body;
 
-    runSql(
+    await executeRunSql(
       `UPDATE registrations SET
         status = ?, assigned_committee_id = ?, assigned_country_id = ?, notes = ?
        WHERE id = ?`,
@@ -790,16 +791,16 @@ apiRouter.put('/admin/registrations/:id', authMiddleware, (req, res) => {
 
     // If status is 'assigned' and committee & country are set, sync with delegations table!
     if (status === 'assigned' && assigned_committee_id && assigned_country_id) {
-      const reg = queryOne<any>('SELECT * FROM registrations WHERE id = ?;', [id]);
+      const reg = await executeQueryOne<any>('SELECT * FROM registrations WHERE id = ?;', [id]);
       if (reg) {
         // check if delegation slot exists
-        const existingDel = queryOne<any>(
+        const existingDel = await executeQueryOne<any>(
           'SELECT * FROM delegations WHERE committee_id = ? AND country_id = ?;',
           [assigned_committee_id, assigned_country_id]
         );
 
         if (existingDel) {
-          runSql(
+          await executeRunSql(
             `UPDATE delegations SET
               delegate_name = ?, delegate_school = ?, delegate_email = ?, delegate_phone = ?, status = 'assigned'
              WHERE id = ?`,
@@ -807,7 +808,7 @@ apiRouter.put('/admin/registrations/:id', authMiddleware, (req, res) => {
           );
         } else {
           const newDelId = 'del_' + Date.now();
-          runSql(
+          await executeRunSql(
             `INSERT INTO delegations (id, committee_id, country_id, delegate_name, delegate_school, delegate_email, delegate_phone, status, notes, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, 'assigned', 'Asignado desde inscripción', ?)`,
             [newDelId, assigned_committee_id, assigned_country_id, reg.full_name, reg.school, reg.email, reg.phone, new Date().toISOString()]
@@ -822,10 +823,10 @@ apiRouter.put('/admin/registrations/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/registrations/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/registrations/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM registrations WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM registrations WHERE id = ?;', [id]);
     res.json({ success: true, message: 'Inscripción eliminada.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar inscripción', details: err.message });
@@ -833,12 +834,12 @@ apiRouter.delete('/admin/registrations/:id', authMiddleware, (req, res) => {
 });
 
 // About Sections CRUD
-apiRouter.get('/admin/about', authMiddleware, (req, res) => {
-  const sections = queryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
+apiRouter.get('/admin/about', authMiddleware, async (req, res) => {
+  const sections = await executeQueryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
   res.json(sections);
 });
 
-apiRouter.post('/admin/about', authMiddleware, canEditInstitutionalContent, (req, res) => {
+apiRouter.post('/admin/about', authMiddleware, canEditInstitutionalContent, async (req, res) => {
   try {
     const { section_key, title, subtitle, content, icon, sort_order, is_active } = req.body;
     if (!title || !content) {
@@ -848,7 +849,7 @@ apiRouter.post('/admin/about', authMiddleware, canEditInstitutionalContent, (req
     const finalKey = section_key ? section_key.trim().toLowerCase().replace(/\s+/g, '_') : id;
     const activeVal = is_active !== undefined ? (is_active ? 1 : 0) : 1;
 
-    runSql(
+    await executeRunSql(
       `INSERT INTO about_sections (id, section_key, title, subtitle, content, icon, sort_order, is_active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, finalKey, title.trim(), subtitle || '', content, icon || 'Globe', Number(sort_order) || 0, activeVal]
@@ -859,12 +860,12 @@ apiRouter.post('/admin/about', authMiddleware, canEditInstitutionalContent, (req
   }
 });
 
-apiRouter.put('/admin/about/:id', authMiddleware, canEditInstitutionalContent, (req, res) => {
+apiRouter.put('/admin/about/:id', authMiddleware, canEditInstitutionalContent, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, subtitle, content, icon, sort_order, is_active } = req.body;
 
-    const existing = queryOne<any>('SELECT * FROM about_sections WHERE id = ?;', [id]);
+    const existing = await executeQueryOne<any>('SELECT * FROM about_sections WHERE id = ?;', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Sección no encontrada.' });
     }
@@ -876,7 +877,7 @@ apiRouter.put('/admin/about/:id', authMiddleware, canEditInstitutionalContent, (
     const updatedSortOrder = sort_order !== undefined ? Number(sort_order) : existing.sort_order;
     const updatedIsActive = is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active;
 
-    runSql(
+    await executeRunSql(
       `UPDATE about_sections SET title = ?, subtitle = ?, content = ?, icon = ?, sort_order = ?, is_active = ?
        WHERE id = ?`,
       [updatedTitle, updatedSubtitle, updatedContent, updatedIcon, updatedSortOrder, updatedIsActive, id]
@@ -887,20 +888,20 @@ apiRouter.put('/admin/about/:id', authMiddleware, canEditInstitutionalContent, (
   }
 });
 
-apiRouter.delete('/admin/about/:id', authMiddleware, canEditInstitutionalContent, (req, res) => {
+apiRouter.delete('/admin/about/:id', authMiddleware, canEditInstitutionalContent, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM about_sections WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM about_sections WHERE id = ?;', [id]);
     res.json({ success: true, message: 'Sección eliminada.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar sección', details: err.message });
   }
 });
 
-apiRouter.post('/admin/about/reset-defaults', authMiddleware, canEditInstitutionalContent, (req, res) => {
+apiRouter.post('/admin/about/reset-defaults', authMiddleware, canEditInstitutionalContent, async (req, res) => {
   try {
     resetDefaultAboutSections();
-    const sections = queryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
+    const sections = await executeQueryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
     res.json({
       success: true,
       message: 'Se han restablecido con éxito los 6 textos institucionales oficiales del BIMUN.',
@@ -912,16 +913,16 @@ apiRouter.post('/admin/about/reset-defaults', authMiddleware, canEditInstitution
 });
 
 // Schedule CRUD
-apiRouter.get('/admin/schedule', authMiddleware, (req, res) => {
-  const items = queryAll('SELECT * FROM schedule ORDER BY date ASC, sort_order ASC;');
+apiRouter.get('/admin/schedule', authMiddleware, async (req, res) => {
+  const items = await executeQueryAll('SELECT * FROM schedule ORDER BY date ASC, sort_order ASC;');
   res.json(items);
 });
 
-apiRouter.post('/admin/schedule', authMiddleware, (req, res) => {
+apiRouter.post('/admin/schedule', authMiddleware, async (req, res) => {
   try {
     const { day_label, date, time_start, time_end, activity, description, location, audience, sort_order } = req.body;
     const id = 'sch_' + Date.now();
-    runSql(
+    await executeRunSql(
       `INSERT INTO schedule (id, day_label, date, time_start, time_end, activity, description, location, audience, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, day_label, date, time_start, time_end, activity, description || '', location || '', audience || 'Todos', sort_order || 0]
@@ -932,11 +933,11 @@ apiRouter.post('/admin/schedule', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/schedule/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/schedule/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { day_label, date, time_start, time_end, activity, description, location, audience, sort_order } = req.body;
-    runSql(
+    await executeRunSql(
       `UPDATE schedule SET day_label = ?, date = ?, time_start = ?, time_end = ?, activity = ?, description = ?, location = ?, audience = ?, sort_order = ?
        WHERE id = ?`,
       [day_label, date, time_start, time_end, activity, description, location, audience, sort_order, id]
@@ -947,10 +948,10 @@ apiRouter.put('/admin/schedule/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/schedule/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/schedule/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM schedule WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM schedule WHERE id = ?;', [id]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar evento', details: err.message });
@@ -958,17 +959,17 @@ apiRouter.delete('/admin/schedule/:id', authMiddleware, (req, res) => {
 });
 
 // Documents CRUD
-apiRouter.get('/admin/documents', authMiddleware, (req, res) => {
-  const docs = queryAll('SELECT * FROM documents ORDER BY sort_order ASC;');
+apiRouter.get('/admin/documents', authMiddleware, async (req, res) => {
+  const docs = await executeQueryAll('SELECT * FROM documents ORDER BY sort_order ASC;');
   res.json(docs);
 });
 
-apiRouter.post('/admin/documents', authMiddleware, (req, res) => {
+apiRouter.post('/admin/documents', authMiddleware, async (req, res) => {
   try {
     const { title, category, file_url, description, file_size, is_featured, sort_order } = req.body;
     const id = 'doc_' + Date.now();
     const now = new Date().toISOString();
-    runSql(
+    await executeRunSql(
       `INSERT INTO documents (id, title, category, file_url, description, file_size, is_featured, sort_order, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, title, category || 'General', file_url || '#', description || '', file_size || '', is_featured ? 1 : 0, sort_order || 0, now]
@@ -979,11 +980,11 @@ apiRouter.post('/admin/documents', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/documents/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/documents/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, category, file_url, description, file_size, is_featured, sort_order } = req.body;
-    runSql(
+    await executeRunSql(
       `UPDATE documents SET title = ?, category = ?, file_url = ?, description = ?, file_size = ?, is_featured = ?, sort_order = ?
        WHERE id = ?`,
       [title, category, file_url, description, file_size, is_featured ? 1 : 0, sort_order, id]
@@ -994,10 +995,10 @@ apiRouter.put('/admin/documents/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/documents/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/documents/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM documents WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM documents WHERE id = ?;', [id]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar documento', details: err.message });
@@ -1005,9 +1006,9 @@ apiRouter.delete('/admin/documents/:id', authMiddleware, (req, res) => {
 });
 
 // Gallery CRUD & Categories
-apiRouter.get('/admin/gallery/categories', authMiddleware, (req, res) => {
+apiRouter.get('/admin/gallery/categories', authMiddleware, async (req, res) => {
   try {
-    const row = queryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+    const row = await executeQueryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
     let categories: string[] = [];
     if (row && row.value) {
       try {
@@ -1021,7 +1022,7 @@ apiRouter.get('/admin/gallery/categories', authMiddleware, (req, res) => {
     }
 
     // Also collect counts per category and include any category present in existing photos
-    const counts = queryAll<{ category: string; count: number }>(
+    const counts = await executeQueryAll<{ category: string; count: number }>(
       'SELECT category, COUNT(*) as count FROM gallery GROUP BY category;'
     );
     const categoryCounts: Record<string, number> = {};
@@ -1040,7 +1041,7 @@ apiRouter.get('/admin/gallery/categories', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.post('/admin/gallery/categories', authMiddleware, (req, res) => {
+apiRouter.post('/admin/gallery/categories', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1062,23 +1063,23 @@ apiRouter.post('/admin/gallery/categories', authMiddleware, (req, res) => {
 
     // Handle renaming category across existing photos
     if (renameFrom && renameTo && renameFrom.trim() !== renameTo.trim()) {
-      runSql('UPDATE gallery SET category = ? WHERE category = ?;', [renameTo.trim(), renameFrom.trim()]);
+      await executeRunSql('UPDATE gallery SET category = ? WHERE category = ?;', [renameTo.trim(), renameFrom.trim()]);
     }
 
     // Handle deleting category and reassigning photos
     if (deleteCategory) {
       const fallbackTarget = reassignTo ? reassignTo.trim() : (cleanedCategories[0] || 'Debate');
-      runSql('UPDATE gallery SET category = ? WHERE category = ?;', [fallbackTarget, deleteCategory.trim()]);
+      await executeRunSql('UPDATE gallery SET category = ? WHERE category = ?;', [fallbackTarget, deleteCategory.trim()]);
     }
 
     const now = new Date().toISOString();
-    runSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+    await executeRunSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
       'gallery_categories',
       JSON.stringify(cleanedCategories),
       now,
     ]);
 
-    const counts = queryAll<{ category: string; count: number }>(
+    const counts = await executeQueryAll<{ category: string; count: number }>(
       'SELECT category, COUNT(*) as count FROM gallery GROUP BY category;'
     );
     const categoryCounts: Record<string, number> = {};
@@ -1094,12 +1095,12 @@ apiRouter.post('/admin/gallery/categories', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.get('/admin/gallery', authMiddleware, (req, res) => {
-  const items = queryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
+apiRouter.get('/admin/gallery', authMiddleware, async (req, res) => {
+  const items = await executeQueryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
   res.json(items);
 });
 
-apiRouter.post('/admin/gallery', authMiddleware, (req, res) => {
+apiRouter.post('/admin/gallery', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1115,7 +1116,7 @@ apiRouter.post('/admin/gallery', authMiddleware, (req, res) => {
     const now = new Date().toISOString();
     const finalCategory = (category && category.trim()) || 'Debate';
 
-    runSql(
+    await executeRunSql(
       `INSERT INTO gallery (id, title, caption, image_url, category, edition, sort_order, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, title || 'Fotografía BIMUN', caption || '', image_url, finalCategory, edition || 'BIMUN XXVII', sort_order || 0, now]
@@ -1123,12 +1124,12 @@ apiRouter.post('/admin/gallery', authMiddleware, (req, res) => {
 
     // Auto-register category in settings if new
     try {
-      const catRow = queryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+      const catRow = await executeQueryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
       if (catRow && catRow.value) {
         const cats = JSON.parse(catRow.value);
         if (Array.isArray(cats) && !cats.includes(finalCategory)) {
           cats.push(finalCategory);
-          runSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+          await executeRunSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
             'gallery_categories',
             JSON.stringify(cats),
             now,
@@ -1144,7 +1145,7 @@ apiRouter.post('/admin/gallery', authMiddleware, (req, res) => {
 });
 
 // Batch photo upload endpoint
-apiRouter.post('/admin/gallery/batch', authMiddleware, (req, res) => {
+apiRouter.post('/admin/gallery/batch', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1173,7 +1174,7 @@ apiRouter.post('/admin/gallery/batch', authMiddleware, (req, res) => {
 
       usedCategories.add(category);
 
-      runSql(
+      await executeRunSql(
         `INSERT INTO gallery (id, title, caption, image_url, category, edition, sort_order, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, title, caption, p.image_url, category, edition, sort_order, now]
@@ -1183,7 +1184,7 @@ apiRouter.post('/admin/gallery/batch', authMiddleware, (req, res) => {
 
     // Auto-register new categories in settings
     try {
-      const catRow = queryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+      const catRow = await executeQueryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
       let currentCategories: string[] = [];
       if (catRow && catRow.value) {
         try {
@@ -1200,7 +1201,7 @@ apiRouter.post('/admin/gallery/batch', authMiddleware, (req, res) => {
         }
       }
       if (changed) {
-        runSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+        await executeRunSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
           'gallery_categories',
           JSON.stringify(currentCategories),
           now,
@@ -1220,7 +1221,7 @@ apiRouter.post('/admin/gallery/batch', authMiddleware, (req, res) => {
 });
 
 // Batch delete photos
-apiRouter.post('/admin/gallery/batch-delete', authMiddleware, (req, res) => {
+apiRouter.post('/admin/gallery/batch-delete', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1233,7 +1234,7 @@ apiRouter.post('/admin/gallery/batch-delete', authMiddleware, (req, res) => {
     }
 
     for (const id of ids) {
-      runSql('DELETE FROM gallery WHERE id = ?;', [id]);
+      await executeRunSql('DELETE FROM gallery WHERE id = ?;', [id]);
     }
 
     res.json({ success: true, count: ids.length });
@@ -1243,7 +1244,7 @@ apiRouter.post('/admin/gallery/batch-delete', authMiddleware, (req, res) => {
 });
 
 // Reset gallery to default demo photos
-apiRouter.post('/admin/gallery/reset-defaults', authMiddleware, (req, res) => {
+apiRouter.post('/admin/gallery/reset-defaults', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1257,7 +1258,7 @@ apiRouter.post('/admin/gallery/reset-defaults', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/gallery/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/gallery/:id', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1266,7 +1267,7 @@ apiRouter.put('/admin/gallery/:id', authMiddleware, (req, res) => {
 
     const { id } = req.params;
     const { title, caption, image_url, category, edition, sort_order } = req.body;
-    runSql(
+    await executeRunSql(
       `UPDATE gallery SET title = ?, caption = ?, image_url = ?, category = ?, edition = ?, sort_order = ?
        WHERE id = ?`,
       [title, caption, image_url, category, edition, sort_order, id]
@@ -1277,7 +1278,7 @@ apiRouter.put('/admin/gallery/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/gallery/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/gallery/:id', authMiddleware, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!['admin', 'superadmin', 'coordinador', 'prensa'].includes(user?.role)) {
@@ -1285,7 +1286,7 @@ apiRouter.delete('/admin/gallery/:id', authMiddleware, (req, res) => {
     }
 
     const { id } = req.params;
-    runSql('DELETE FROM gallery WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM gallery WHERE id = ?;', [id]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar foto', details: err.message });
@@ -1293,16 +1294,16 @@ apiRouter.delete('/admin/gallery/:id', authMiddleware, (req, res) => {
 });
 
 // Organizing Team CRUD
-apiRouter.get('/admin/team', authMiddleware, (req, res) => {
-  const team = queryAll('SELECT * FROM organizing_team ORDER BY sort_order ASC;');
+apiRouter.get('/admin/team', authMiddleware, async (req, res) => {
+  const team = await executeQueryAll('SELECT * FROM organizing_team ORDER BY sort_order ASC;');
   res.json(team);
 });
 
-apiRouter.post('/admin/team', authMiddleware, (req, res) => {
+apiRouter.post('/admin/team', authMiddleware, async (req, res) => {
   try {
     const { name, role, category, photo_url, bio, email, sort_order } = req.body;
     const id = 'tm_' + Date.now();
-    runSql(
+    await executeRunSql(
       `INSERT INTO organizing_team (id, name, role, category, photo_url, bio, email, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, name, role, category || 'Secretaría', photo_url || '', bio || '', email || '', sort_order || 0]
@@ -1313,11 +1314,11 @@ apiRouter.post('/admin/team', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/team/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/team/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, role, category, photo_url, bio, email, sort_order } = req.body;
-    runSql(
+    await executeRunSql(
       `UPDATE organizing_team SET name = ?, role = ?, category = ?, photo_url = ?, bio = ?, email = ?, sort_order = ?
        WHERE id = ?`,
       [name, role, category, photo_url, bio, email, sort_order, id]
@@ -1328,10 +1329,10 @@ apiRouter.put('/admin/team/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/team/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/team/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM organizing_team WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM organizing_team WHERE id = ?;', [id]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar miembro', details: err.message });
@@ -1339,17 +1340,17 @@ apiRouter.delete('/admin/team/:id', authMiddleware, (req, res) => {
 });
 
 // News CRUD
-apiRouter.get('/admin/news', authMiddleware, (req, res) => {
-  const news = queryAll('SELECT * FROM news ORDER BY publish_date DESC;');
+apiRouter.get('/admin/news', authMiddleware, async (req, res) => {
+  const news = await executeQueryAll('SELECT * FROM news ORDER BY publish_date DESC;');
   res.json(news);
 });
 
-apiRouter.post('/admin/news', authMiddleware, (req, res) => {
+apiRouter.post('/admin/news', authMiddleware, async (req, res) => {
   try {
     const { title, slug, excerpt, content, image_url, category, publish_date, is_published } = req.body;
     const id = 'nw_' + Date.now();
     const cleanSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    runSql(
+    await executeRunSql(
       `INSERT INTO news (id, title, slug, excerpt, content, image_url, category, publish_date, is_published)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, title, cleanSlug, excerpt || '', content, image_url || '', category || 'General', publish_date || new Date().toISOString().split('T')[0], is_published ? 1 : 0]
@@ -1360,11 +1361,11 @@ apiRouter.post('/admin/news', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.put('/admin/news/:id', authMiddleware, (req, res) => {
+apiRouter.put('/admin/news/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, slug, excerpt, content, image_url, category, publish_date, is_published } = req.body;
-    runSql(
+    await executeRunSql(
       `UPDATE news SET title = ?, slug = ?, excerpt = ?, content = ?, image_url = ?, category = ?, publish_date = ?, is_published = ?
        WHERE id = ?`,
       [title, slug, excerpt, content, image_url, category, publish_date, is_published ? 1 : 0, id]
@@ -1375,10 +1376,10 @@ apiRouter.put('/admin/news/:id', authMiddleware, (req, res) => {
   }
 });
 
-apiRouter.delete('/admin/news/:id', authMiddleware, (req, res) => {
+apiRouter.delete('/admin/news/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    runSql('DELETE FROM news WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM news WHERE id = ?;', [id]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar noticia', details: err.message });
@@ -1394,17 +1395,17 @@ apiRouter.get('/admin/export-database', authMiddleware, adminOnlyMiddleware, asy
       exported_at: new Date().toISOString(),
       target_compatibilities: ['SQLite', 'PostgreSQL', 'MySQL'],
       tables: {
-        settings: queryAll('SELECT * FROM settings;'),
-        about_sections: queryAll('SELECT * FROM about_sections;'),
-        committees: queryAll('SELECT * FROM committees;'),
-        countries: queryAll('SELECT * FROM countries;'),
-        delegations: queryAll('SELECT * FROM delegations;'),
-        schedule: queryAll('SELECT * FROM schedule;'),
-        documents: queryAll('SELECT * FROM documents;'),
-        gallery: queryAll('SELECT * FROM gallery;'),
-        organizing_team: queryAll('SELECT * FROM organizing_team;'),
-        news: queryAll('SELECT * FROM news;'),
-        registrations: queryAll('SELECT * FROM registrations;'),
+        settings: await executeQueryAll('SELECT * FROM settings;'),
+        about_sections: await executeQueryAll('SELECT * FROM about_sections;'),
+        committees: await executeQueryAll('SELECT * FROM committees;'),
+        countries: await executeQueryAll('SELECT * FROM countries;'),
+        delegations: await executeQueryAll('SELECT * FROM delegations;'),
+        schedule: await executeQueryAll('SELECT * FROM schedule;'),
+        documents: await executeQueryAll('SELECT * FROM documents;'),
+        gallery: await executeQueryAll('SELECT * FROM gallery;'),
+        organizing_team: await executeQueryAll('SELECT * FROM organizing_team;'),
+        news: await executeQueryAll('SELECT * FROM news;'),
+        registrations: await executeQueryAll('SELECT * FROM registrations;'),
       }
     };
 
@@ -1428,7 +1429,7 @@ import {
 } from './dbManager.ts';
 
 // Get current database status and configuration
-apiRouter.get('/admin/db-config', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.get('/admin/db-config', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const status = getDatabaseStatus();
     const config = getCurrentConfigSafe();
@@ -1570,9 +1571,9 @@ apiRouter.post('/admin/system/load-seed-data', authMiddleware, async (req, res) 
 // -------------------------------------------------------------
 
 // List all system users
-apiRouter.get('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.get('/admin/users', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
-    const users = queryAll<any>('SELECT id, username, display_name, role, created_at FROM users ORDER BY created_at ASC;');
+    const users = await executeQueryAll<any>('SELECT id, username, display_name, role, created_at FROM users ORDER BY created_at ASC;');
     res.json({ success: true, users });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al obtener usuarios', details: err.message });
@@ -1580,7 +1581,7 @@ apiRouter.get('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) =>
 });
 
 // Create new user
-apiRouter.post('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.post('/admin/users', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const { username, display_name, password, role } = req.body;
     if (!username || !display_name || !password) {
@@ -1592,7 +1593,7 @@ apiRouter.post('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) =
     }
 
     const cleanUsername = username.trim().toLowerCase();
-    const existing = queryOne('SELECT id FROM users WHERE username = ?;', [cleanUsername]);
+    const existing = await executeQueryOne('SELECT id FROM users WHERE username = ?;', [cleanUsername]);
     if (existing) {
       return res.status(409).json({ error: 'El nombre de usuario ya está registrado en el sistema.' });
     }
@@ -1605,7 +1606,7 @@ apiRouter.post('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) =
     const id = `usr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const now = new Date().toISOString();
 
-    runSql(
+    await executeRunSql(
       'INSERT INTO users (id, username, password_hash, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?);',
       [id, cleanUsername, password_hash, display_name.trim(), assignedRole, now]
     );
@@ -1621,13 +1622,13 @@ apiRouter.post('/admin/users', authMiddleware, adminOnlyMiddleware, (req, res) =
 });
 
 // Update user details (name, role)
-apiRouter.put('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.put('/admin/users/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { display_name, role } = req.body;
     const currentUser = (req as any).user;
 
-    const existing = queryOne<any>('SELECT id, role FROM users WHERE id = ?;', [id]);
+    const existing = await executeQueryOne<any>('SELECT id, role FROM users WHERE id = ?;', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
@@ -1642,9 +1643,9 @@ apiRouter.put('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, res
     const updatedName = display_name ? display_name.trim() : undefined;
 
     if (updatedName) {
-      runSql('UPDATE users SET display_name = ?, role = ? WHERE id = ?;', [updatedName, updatedRole, id]);
+      await executeRunSql('UPDATE users SET display_name = ?, role = ? WHERE id = ?;', [updatedName, updatedRole, id]);
     } else {
-      runSql('UPDATE users SET role = ? WHERE id = ?;', [updatedRole, id]);
+      await executeRunSql('UPDATE users SET role = ? WHERE id = ?;', [updatedRole, id]);
     }
 
     res.json({ success: true, message: 'Usuario actualizado correctamente.' });
@@ -1654,7 +1655,7 @@ apiRouter.put('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, res
 });
 
 // Reset user password (admin reset)
-apiRouter.post('/admin/users/:id/reset-password', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.post('/admin/users/:id/reset-password', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { new_password } = req.body;
@@ -1663,14 +1664,14 @@ apiRouter.post('/admin/users/:id/reset-password', authMiddleware, adminOnlyMiddl
       return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
     }
 
-    const existing = queryOne('SELECT id FROM users WHERE id = ?;', [id]);
+    const existing = await executeQueryOne('SELECT id FROM users WHERE id = ?;', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
 
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(new_password, salt);
-    runSql('UPDATE users SET password_hash = ? WHERE id = ?;', [hash, id]);
+    await executeRunSql('UPDATE users SET password_hash = ? WHERE id = ?;', [hash, id]);
 
     res.json({ success: true, message: 'Contraseña restablecida exitosamente.' });
   } catch (err: any) {
@@ -1679,7 +1680,7 @@ apiRouter.post('/admin/users/:id/reset-password', authMiddleware, adminOnlyMiddl
 });
 
 // Delete user
-apiRouter.delete('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.delete('/admin/users/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const currentUser = (req as any).user;
@@ -1688,12 +1689,12 @@ apiRouter.delete('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, 
       return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta de usuario en sesión.' });
     }
 
-    const existing = queryOne('SELECT id FROM users WHERE id = ?;', [id]);
+    const existing = await executeQueryOne('SELECT id FROM users WHERE id = ?;', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
 
-    runSql('DELETE FROM users WHERE id = ?;', [id]);
+    await executeRunSql('DELETE FROM users WHERE id = ?;', [id]);
     res.json({ success: true, message: 'Usuario eliminado del sistema.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar usuario', details: err.message });
@@ -1705,7 +1706,7 @@ apiRouter.delete('/admin/users/:id', authMiddleware, adminOnlyMiddleware, (req, 
 // -------------------------------------------------------------
 
 // Get SMTP Configuration (safe view without exposing raw password)
-apiRouter.get('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.get('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const config = getSmtpConfig();
     res.json({
@@ -1727,7 +1728,7 @@ apiRouter.get('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, (req, r
 });
 
 // Update SMTP Configuration
-apiRouter.put('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, (req, res) => {
+apiRouter.put('/admin/smtp/config', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   try {
     const { host, port, secure, user, password, from_name, reply_to, is_enabled } = req.body;
 
