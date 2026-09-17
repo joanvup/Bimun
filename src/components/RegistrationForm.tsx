@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Send, CheckCircle2, AlertCircle, User, BookOpen, Shield, CreditCard, AlertTriangle } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, User, BookOpen, Shield, CreditCard, AlertTriangle, Phone } from 'lucide-react';
 import { Committee, Country } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 import { ImageUploadField } from './common/ImageUploadField.tsx';
+import { PhoneInputWithMask } from './common/PhoneInputWithMask.tsx';
 
 interface RegistrationFormProps {
   committees: Committee[];
@@ -50,6 +51,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     payment_receipt: '',
   });
 
+  // Emergency contact split state for intuitive UX
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,7 +63,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Update if parent passes selection
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialCommittee) {
       setFormData((prev) => ({ ...prev, committee_preference_1: initialCommittee }));
       setErrors((prev) => ({ ...prev, committee_preference_1: undefined }));
@@ -67,6 +72,18 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       setFormData((prev) => ({ ...prev, country_preference_1: initialCountry }));
     }
   }, [initialCommittee, initialCountry]);
+
+  // Sync emergency contact fields to formData
+  useEffect(() => {
+    if (emergencyName || emergencyPhone) {
+      const combined = emergencyName && emergencyPhone
+        ? `${emergencyName.trim()} (${emergencyPhone.trim()})`
+        : emergencyName.trim() || emergencyPhone.trim();
+      setFormData((prev) => ({ ...prev, emergency_contact: combined }));
+    } else {
+      setFormData((prev) => ({ ...prev, emergency_contact: '' }));
+    }
+  }, [emergencyName, emergencyPhone]);
 
   // Validation logic
   const validateField = (name: string, value: string, currentData = formData): string | undefined => {
@@ -102,8 +119,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         const digitsOnly = trimmed.replace(/\D/g, '');
         if (digitsOnly.length < 7) {
           return isEn
-            ? 'Phone number must have at least 7 digits.'
-            : 'El número telefónico debe contener al menos 7 dígitos.';
+            ? 'Please enter a complete phone number (at least 7 digits).'
+            : 'Por favor ingresa un número telefónico completo (al menos 7 dígitos).';
         }
         if (digitsOnly.length > 15) {
           return isEn
@@ -203,11 +220,27 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }
   };
 
+  const handlePhoneChange = (fullFormattedValue: string) => {
+    const nextFormData = { ...formData, phone: fullFormattedValue };
+    setFormData(nextFormData);
+
+    if (touched.phone) {
+      const fieldError = validateField('phone', fullFormattedValue, nextFormData);
+      setErrors((prev) => ({ ...prev, phone: fieldError }));
+    }
+  };
+
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
     const fieldError = validateField(name, value);
     setErrors((prev) => ({ ...prev, [name]: fieldError }));
+  };
+
+  const handlePhoneBlur = () => {
+    setTouched((prev) => ({ ...prev, phone: true }));
+    const fieldError = validateField('phone', formData.phone);
+    setErrors((prev) => ({ ...prev, phone: fieldError }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -352,6 +385,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                     emergency_contact: '',
                     payment_receipt: '',
                   });
+                  setEmergencyName('');
+                  setEmergencyPhone('');
                   setErrors({});
                   setTouched({});
                 }}
@@ -393,7 +428,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-semibold text-slate-700">{t.registration.full_name} *</label>
                     {touched.full_name && !errors.full_name && (
-                      <span className="text-[11px] text-emerald-600 flex items-center gap-1">
+                      <span className="text-[11px] text-emerald-600 flex items-center gap-1 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? 'Valid' : 'Correcto'}
                       </span>
                     )}
@@ -426,7 +461,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-semibold text-slate-700">{t.registration.email} *</label>
                     {touched.email && !errors.email && (
-                      <span className="text-[11px] text-emerald-600 flex items-center gap-1">
+                      <span className="text-[11px] text-emerald-600 flex items-center gap-1 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? 'Valid' : 'Correcto'}
                       </span>
                     )}
@@ -454,45 +489,26 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   )}
                 </div>
 
-                {/* Phone */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-slate-700">{t.registration.phone} *</label>
-                    {touched.phone && !errors.phone && (
-                      <span className="text-[11px] text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? 'Valid' : 'Correcto'}
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder={t.registration.phone_placeholder}
-                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-sm focus:outline-none transition-all text-slate-800 ${
-                      touched.phone && errors.phone
-                        ? 'border-rose-400 bg-rose-50/30 focus:ring-2 focus:ring-rose-500'
-                        : touched.phone && !errors.phone
-                        ? 'border-emerald-300 focus:ring-2 focus:ring-emerald-500'
-                        : 'border-slate-300 focus:ring-2 focus:ring-blue-500'
-                    }`}
-                  />
-                  {touched.phone && errors.phone && (
-                    <p className="text-xs text-rose-600 font-medium flex items-center gap-1.5 pt-0.5">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {errors.phone}
-                    </p>
-                  )}
-                </div>
+                {/* Masked Phone Input with Country Code Selector */}
+                <PhoneInputWithMask
+                  id="delegate-phone"
+                  name="phone"
+                  label={t.registration.phone}
+                  required
+                  value={formData.phone}
+                  onChange={handlePhoneChange}
+                  onBlur={handlePhoneBlur}
+                  error={errors.phone}
+                  touched={touched.phone}
+                  isEn={isEn}
+                />
 
                 {/* School */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-semibold text-slate-700">{t.registration.school} *</label>
                     {touched.school && !errors.school && (
-                      <span className="text-[11px] text-emerald-600 flex items-center gap-1">
+                      <span className="text-[11px] text-emerald-600 flex items-center gap-1 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? 'Valid' : 'Correcto'}
                       </span>
                     )}
@@ -591,7 +607,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-semibold text-slate-700">{t.registration.committee_1} *</label>
                     {touched.committee_preference_1 && !errors.committee_preference_1 && (
-                      <span className="text-[11px] text-emerald-600 flex items-center gap-1">
+                      <span className="text-[11px] text-emerald-600 flex items-center gap-1 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? 'Selected' : 'Seleccionado'}
                       </span>
                     )}
@@ -703,7 +719,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               </div>
             </div>
 
-            {/* Step 3: Logistics & Experience */}
+            {/* Step 3: Logistics & Emergency Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
                 <Shield className="w-4 h-4 text-blue-600" />
@@ -727,7 +743,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-semibold text-slate-700">
                     {t.registration.dietary}
                   </label>
@@ -741,19 +757,30 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   />
                 </div>
 
+                {/* Emergency Contact Name */}
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700">
-                    {isEn ? 'Emergency Contact Name & Phone' : 'Nombre y Teléfono de Contacto de Emergencia'}
+                    {isEn ? 'Emergency Contact Name' : 'Nombre del Contacto / Acudiente'}
                   </label>
                   <input
                     type="text"
-                    name="emergency_contact"
-                    value={formData.emergency_contact}
-                    onChange={handleChange}
-                    placeholder="Nombre del Acudiente / +57 300 000 0000"
+                    value={emergencyName}
+                    onChange={(e) => setEmergencyName(e.target.value)}
+                    placeholder={isEn ? 'Parent or Guardian Full Name' : 'Nombre del Padre, Madre o Tutor'}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
+
+                {/* Emergency Contact Masked Phone */}
+                <PhoneInputWithMask
+                  id="emergency-phone"
+                  name="emergency_phone"
+                  label={isEn ? 'Emergency Contact Phone' : 'Teléfono del Contacto de Emergencia'}
+                  value={emergencyPhone}
+                  onChange={(fullValue) => setEmergencyPhone(fullValue)}
+                  isEn={isEn}
+                  helperText={isEn ? 'Direct phone number for urgent notifications' : 'Teléfono directo para avisos de emergencia'}
+                />
               </div>
             </div>
 
