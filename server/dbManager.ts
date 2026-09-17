@@ -829,51 +829,82 @@ export function getCurrentConfigSafe(): DatabaseConnectionConfig {
 // -------------------------------------------------------------
 // Unified SQL Execution Layer (Universal Driver)
 // -------------------------------------------------------------
+
+function convertSqlForMySql(sql: string, params: any[]): { sql: string, params: any[] } {
+  let outSql = sql;
+  let outParams = [...params];
+  
+  outSql = outSql.replace(/WHERE key =/g, 'WHERE `key` =');
+  outSql = outSql.replace(/\(key, value, updated_at\)/g, '(`key`, value, updated_at)');
+  outSql = outSql.replace(/ON CONFLICT\(key\)/g, 'ON CONFLICT(`key`)');
+  
+  if (outSql.includes('INSERT OR REPLACE INTO settings')) {
+     outSql = outSql.replace(/INSERT OR REPLACE INTO settings \(`key`, value, updated_at\) VALUES \(\?, \?, \?\);?/g,
+      'INSERT INTO settings (`key`, value, updated_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, updated_at = ?;');
+     outParams = [...params, params[1], params[2]];
+  }
+  
+  if (outSql.includes('ON CONFLICT(`key`) DO UPDATE')) {
+     outSql = outSql.replace(/ON CONFLICT\(`key`\) DO UPDATE SET value = excluded\.value, updated_at = excluded\.updated_at;?/g, 
+     'ON DUPLICATE KEY UPDATE value = ?, updated_at = ?;');
+     outParams = [...params, params[1], params[2]];
+  }
+  return { sql: outSql, params: outParams };
+}
+
+function convertSqlForPgAdvanced(sql: string, params: any[]): { sql: string, params: any[] } {
+  let outSql = sql;
+  if (outSql.includes('INSERT OR REPLACE INTO settings')) {
+     outSql = outSql.replace(/INSERT OR REPLACE INTO settings \(key, value, updated_at\) VALUES \(\?, \?, \?\);?/g,
+      'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;');
+  }
+  // Remove SQLite's excluded. (lowercase) with EXCLUDED.
+  outSql = outSql.replace(/excluded\.value/g, 'EXCLUDED.value').replace(/excluded\.updated_at/g, 'EXCLUDED.updated_at');
+  
+  let paramIndex = 1;
+  outSql = outSql.replace(/\?/g, () => `$${paramIndex++}`);
+  return { sql: outSql, params };
+}
+
 function convertPlaceholdersForPg(sql: string): string {
   let index = 1;
   return sql.replace(/\?/g, () => `$${index++}`);
 }
 
-export async function executeQueryAll<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+export async function executeQueryAll<T>(sql: string, params: any[] = []): Promise<T[]> {
   if (!isInitialized) {
     await initializeDatabaseManager();
   }
-
   if (activeDatabaseType === 'postgres' && pgPool) {
     try {
-      const pgSql = convertPlaceholdersForPg(sql);
-      const res = await pgPool.query(pgSql, params);
+      const { sql: pgSql, params: pgParams } = convertSqlForPgAdvanced(sql, params);
+      const res = await pgPool.query(pgSql, pgParams);
       return res.rows as T[];
     } catch (err: any) {
-      console.error('[PostgreSQL Error, falling back to SQLite]', err.message);
+      console.error('[PostgreSQL Query Error, falling back to SQLite]', err.message);
       lastErrorMessage = `PostgreSQL: ${err.message}`;
       activeDatabaseType = 'sqlite';
     }
   }
-
   if (activeDatabaseType === 'mysql' && mysqlPool) {
     try {
-      const [rows] = await mysqlPool.query(sql, params);
+      const { sql: mysqlSql, params: mysqlParams } = convertSqlForMySql(sql, params);
+      const [rows] = await mysqlPool.query(mysqlSql, mysqlParams);
       return rows as T[];
     } catch (err: any) {
-      console.error('[MySQL Error, falling back to SQLite]', err.message);
+      console.error('[MySQL Query Error, falling back to SQLite]', err.message);
       lastErrorMessage = `MySQL: ${err.message}`;
       activeDatabaseType = 'sqlite';
     }
   }
-
-  // SQLite implementation
   const db = await getSqliteDb();
   const stmt = db.prepare(sql);
-  if (params && params.length > 0) {
-    stmt.bind(params);
-  }
-  const results: T[] = [];
+  const rows = [];
   while (stmt.step()) {
-    results.push(stmt.getAsObject() as T);
+    rows.push(stmt.getAsObject());
   }
   stmt.free();
-  return results;
+  return rows as T[];
 }
 
 export async function executeQueryOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
@@ -885,11 +916,10 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
   if (!isInitialized) {
     await initializeDatabaseManager();
   }
-
   if (activeDatabaseType === 'postgres' && pgPool) {
     try {
-      const pgSql = convertPlaceholdersForPg(sql);
-      await pgPool.query(pgSql, params);
+      const { sql: pgSql, params: pgParams } = convertSqlForPgAdvanced(sql, params);
+      await pgPool.query(pgSql, pgParams);
       return;
     } catch (err: any) {
       console.error('[PostgreSQL Write Error, falling back to SQLite]', err.message);
@@ -897,10 +927,10 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
       activeDatabaseType = 'sqlite';
     }
   }
-
   if (activeDatabaseType === 'mysql' && mysqlPool) {
     try {
-      await mysqlPool.query(sql, params);
+      const { sql: mysqlSql, params: mysqlParams } = convertSqlForMySql(sql, params);
+      await mysqlPool.query(mysqlSql, mysqlParams);
       return;
     } catch (err: any) {
       console.error('[MySQL Write Error, falling back to SQLite]', err.message);
@@ -908,8 +938,6 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
       activeDatabaseType = 'sqlite';
     }
   }
-
-  // SQLite execution
   const db = await getSqliteDb();
   db.run(sql, params);
   saveSqliteDisk();
@@ -973,14 +1001,13 @@ export async function migrateCurrentDataToTarget(targetConfig: DatabaseConnectio
 
           // UPSERT pattern for Postgres
           const primaryKey = keys.includes('key') ? 'key' : 'id';
-                    const updateKeys = keys.filter((k) => k !== 'id' && k !== 'key');
-          const updateSets = updateKeys.map((k) => `\`${k}\` = ?`).join(', ');
-          const updateValues = updateKeys.map((k) => row[k]);
-          
+          const updateSets = keys
+            .filter((k) => k !== primaryKey)
+            .map((k) => `"${k}" = EXCLUDED."${k}"`)
+            .join(', ');
           const upsertSql = updateSets
-            ? `INSERT INTO \`${table}\` (${quotedKeys}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updateSets};`
-            : `INSERT INTO \`${table}\` (${quotedKeys}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE \`${keys[0]}\` = \`${keys[0]}\`;`;
-
+            ? `INSERT INTO ${table} (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT ("${primaryKey}") DO UPDATE SET ${updateSets};`
+            : `INSERT INTO ${table} (${quotedKeys}) VALUES (${placeholders}) ON CONFLICT ("${primaryKey}") DO NOTHING;`;
           await targetPool.query(upsertSql, [...values, ...updateValues]);
           rowsMigrated++;
         }

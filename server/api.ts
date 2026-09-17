@@ -116,7 +116,7 @@ apiRouter.get('/public/data', async (req, res) => {
     const committees = await executeQueryAll('SELECT * FROM committees WHERE status != "archived" ORDER BY sort_order ASC;');
 
     // Active Countries
-    const countries = await executeQueryAll('SELECT * FROM countries WHERE status = "active" ORDER BY name ASC;');
+    const countries = await executeQueryAll(`SELECT * FROM countries WHERE status = 'active' ORDER BY name ASC;`);
 
     // Delegations with Committee and Country joins
     const delegations = await executeQueryAll(`
@@ -341,8 +341,8 @@ apiRouter.get('/admin/stats', authMiddleware, async (req, res) => {
   try {
     const comCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM committees;'))?.count || 0;
     const delTotal = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations;'))?.count || 0;
-    const delAssigned = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM delegations WHERE status = "assigned";'))?.count || 0;
-    const regPending = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations WHERE status = "pending";'))?.count || 0;
+    const delAssigned = (await executeQueryOne<{ count: number }>(`SELECT COUNT(*) as count FROM delegations WHERE status = 'assigned';`))?.count || 0;
+    const regPending = (await executeQueryOne<{ count: number }>(`SELECT COUNT(*) as count FROM registrations WHERE status = 'pending';`))?.count || 0;
     const regTotal = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM registrations;'))?.count || 0;
     const cntCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM countries;'))?.count || 0;
     const docCount = (await executeQueryOne<{ count: number }>('SELECT COUNT(*) as count FROM documents;'))?.count || 0;
@@ -1008,7 +1008,7 @@ apiRouter.delete('/admin/documents/:id', authMiddleware, async (req, res) => {
 // Gallery CRUD & Categories
 apiRouter.get('/admin/gallery/categories', authMiddleware, async (req, res) => {
   try {
-    const row = await executeQueryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+    const row = await executeQueryOne<{ value: string }>(`SELECT value FROM settings WHERE key = 'gallery_categories';`);
     let categories: string[] = [];
     if (row && row.value) {
       try {
@@ -1124,7 +1124,7 @@ apiRouter.post('/admin/gallery', authMiddleware, async (req, res) => {
 
     // Auto-register category in settings if new
     try {
-      const catRow = await executeQueryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+      const catRow = await executeQueryOne<{ value: string }>(`SELECT value FROM settings WHERE key = 'gallery_categories';`);
       if (catRow && catRow.value) {
         const cats = JSON.parse(catRow.value);
         if (Array.isArray(cats) && !cats.includes(finalCategory)) {
@@ -1184,7 +1184,7 @@ apiRouter.post('/admin/gallery/batch', authMiddleware, async (req, res) => {
 
     // Auto-register new categories in settings
     try {
-      const catRow = await executeQueryOne<{ value: string }>('SELECT value FROM settings WHERE key = "gallery_categories";');
+      const catRow = await executeQueryOne<{ value: string }>(`SELECT value FROM settings WHERE key = 'gallery_categories';`);
       let currentCategories: string[] = [];
       if (catRow && catRow.value) {
         try {
