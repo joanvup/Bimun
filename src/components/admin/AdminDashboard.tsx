@@ -926,6 +926,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-6">
+                {/* Maintenance Mode configuration */}
+                <div className="bg-slate-950/60 rounded-2xl border border-slate-800 p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        Modo Mantenimiento de la Plataforma
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Activa este interruptor para restringir el acceso del público general y mostrar un comunicado de mantenimiento temporal. El CMS seguirá siendo accesible.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, maintenance_mode: !settings.maintenance_mode })}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all border ${
+                        settings.maintenance_mode
+                          ? 'bg-rose-950/60 text-rose-300 border-rose-700/60 shadow-lg shadow-rose-950/30'
+                          : 'bg-slate-900 hover:bg-slate-800 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${settings.maintenance_mode ? 'bg-rose-400 animate-pulse' : 'bg-slate-500'}`} />
+                      <span>{settings.maintenance_mode ? 'Mantenimiento Activo' : 'Mantenimiento Desactivado'}</span>
+                    </button>
+                  </div>
+
+                  {settings.maintenance_mode && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300">
+                        Mensaje Informativo de Mantenimiento para los Visitantes
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={settings.maintenance_message || ''}
+                        onChange={(e) => setSettings({ ...settings, maintenance_message: e.target.value })}
+                        placeholder="Ej: Nuestra plataforma está experimentando una actualización de servidores para la XXVII edición de BIMUN. Estaremos de vuelta muy pronto. Gracias por tu paciencia."
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-rose-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Este mensaje se renderizará de forma destacada en la pantalla de mantenimiento que verán las delegaciones e invitados públicos.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Active sections toggle */}
                 <div className="bg-slate-950/60 rounded-2xl border border-slate-800 p-5 space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">

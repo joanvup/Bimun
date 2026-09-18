@@ -520,6 +520,8 @@ function seedInitialData(db: Database): void {
         contacto: true,
       })
     ],
+    ['maintenance_mode', 'false'],
+    ['maintenance_message', 'Nuestra plataforma está experimentando una actualización de servidores para la XXVII edición de BIMUN. Estaremos de vuelta muy pronto. Gracias por tu paciencia.'],
   ];
 
   for (const [key, val] of defaultSettings) {

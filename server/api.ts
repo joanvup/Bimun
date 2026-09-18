@@ -81,6 +81,8 @@ apiRouter.get('/public/data', async (req, res) => {
         } catch {
           settings[s.key] = s.value;
         }
+      } else if (s.key === 'maintenance_mode') {
+        settings[s.key] = s.value === 'true';
       } else {
         settings[s.key] = s.value;
       }

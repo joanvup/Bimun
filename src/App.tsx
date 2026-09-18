@@ -14,6 +14,7 @@ import { RegistrationForm } from './components/RegistrationForm.tsx';
 import { ContactSection } from './components/ContactSection.tsx';
 import { Footer } from './components/Footer.tsx';
 import { AdminLoginModal } from './components/admin/AdminLoginModal.tsx';
+import { MaintenanceView } from './components/common/MaintenanceView.tsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
 import { ScrollToTopButton } from './components/ScrollToTopButton.tsx';
 import { FloatingThemeToggle } from './components/common/FloatingThemeToggle.tsx';
@@ -197,6 +198,24 @@ export default function App() {
         }}
         onDataUpdated={fetchPublicData}
       />
+    );
+  }
+
+  // If in maintenance mode and NOT logged in as admin, show maintenance splash
+  if (settings?.maintenance_mode && !adminToken) {
+    return (
+      <>
+        <MaintenanceView
+          settings={settings}
+          onOpenCMS={() => setIsLoginModalOpen(true)}
+        />
+        <AdminLoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+        <FloatingThemeToggle />
+      </>
     );
   }
 

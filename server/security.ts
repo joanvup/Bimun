@@ -185,6 +185,8 @@ const PUBLIC_SETTINGS_WHITELIST = new Set([
   'cta_secondary_link',
   'cta_tertiary_text',
   'cta_tertiary_link',
+  'maintenance_mode',
+  'maintenance_message',
 ]);
 
 export function filterPublicSettings(allSettings: Record<string, any>): Record<string, any> {

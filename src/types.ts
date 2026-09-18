@@ -44,6 +44,8 @@ export interface BIMUNSettings {
   };
   gallery_categories?: string[];
   tradition_years?: string;
+  maintenance_mode?: boolean;
+  maintenance_message?: string;
 }
 
 export interface AboutSection {
