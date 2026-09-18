@@ -113,6 +113,17 @@ export default function App() {
       document.title = `${settings.bimun_name} – ${settings.slogan || 'Modelo de Naciones Unidas'}`;
     }
 
+    // 1b. Dynamic document/page Favicon to match the official Logo uploaded in CMS settings
+    if (settings.logo_url) {
+      let faviconLink = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
+      if (!faviconLink) {
+        faviconLink = document.createElement('link');
+        faviconLink.setAttribute('rel', 'icon');
+        document.head.appendChild(faviconLink);
+      }
+      faviconLink.setAttribute('href', settings.logo_url);
+    }
+
     const updateMetaTag = (selector: string, attributeName: string, attributeValue: string, contentValue: string) => {
       let element = document.querySelector(selector);
       if (!element) {

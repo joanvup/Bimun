@@ -25,6 +25,96 @@ async function startServer() {
   // API Routes
   app.use('/api', apiRouter);
 
+  // Dynamic XML Sitemap for Google SEO (applet-seo)
+  app.get('/sitemap.xml', (req, res) => {
+    const host = req.get('host') || 'bimun.colegiobilingue.edu.co';
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${host}`;
+    const now = new Date().toISOString().split('T')[0];
+
+    const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Pagina Principal (Home) -->
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- Seccion Nosotros -->
+  <url>
+    <loc>${baseUrl}/#nosotros</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Seccion Comisiones / Comités -->
+  <url>
+    <loc>${baseUrl}/#comisiones</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Matriz de Paises y Delegados -->
+  <url>
+    <loc>${baseUrl}/#paises</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Cronograma Oficial de Eventos -->
+  <url>
+    <loc>${baseUrl}/#cronograma</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Biblioteca de Documentos y Guias -->
+  <url>
+    <loc>${baseUrl}/#documentos</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Seccion de Noticias y Comunicados -->
+  <url>
+    <loc>${baseUrl}/#noticias</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Formulario de Inscripciones -->
+  <url>
+    <loc>${baseUrl}/#inscripciones</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Informacion de Contacto -->
+  <url>
+    <loc>${baseUrl}/#contacto</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>`;
+
+    res.header('Content-Type', 'application/xml');
+    res.send(sitemapXml.trim());
+  });
+
+  // Robots.txt to configure crawl instructions and sitemap reference
+  app.get('/robots.txt', (req, res) => {
+    const host = req.get('host') || 'bimun.colegiobilingue.edu.co';
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    res.type('text/plain');
+    res.send(`User-agent: *
+Allow: /
+Disallow: /api/admin/
+
+Sitemap: ${protocol}://${host}/sitemap.xml`.trim());
+  });
+
   // Health check endpoint
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'BIMUN Platform API' });
