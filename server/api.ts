@@ -2182,17 +2182,13 @@ apiRouter.post('/admin/smtp/send-test', authMiddleware, adminOnlyMiddleware, asy
   }
 });
 
-// AI-generated suggestions for meta_title and meta_description using Gemini 3.8 Flash (applet-seo + gemini-api)
-apiRouter.post('/admin/suggest-seo', authMiddleware, canEditInstitutionalContent, async (req, res) => {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(400).json({
-        error: 'La API Key de Gemini no está configurada en las variables de entorno.',
-        details: 'Por favor, asocie su clave en la sección de configuración de secretos de AI Studio.'
-      });
-    }
+// AI-generated suggestions for meta_title and meta_description using Gemini with robust fallbacks (applet-seo + gemini-api)
+apiRouter.post('/admin/suggest-seo', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  let eventName = 'BIMUN';
+  let slogan = '';
+  let institution = 'Colegio Bilingüe de Valledupar';
 
+  try {
     // Initialize database connection
     await getDb();
 
@@ -2214,10 +2210,15 @@ apiRouter.post('/admin/suggest-seo', authMiddleware, canEditInstitutionalContent
     );
 
     // Construct metadata summary of the event for Gemini
-    const eventName = settings['bimun_name'] || 'BIMUN';
-    const slogan = settings['slogan'] || '';
+    eventName = settings['bimun_name'] || settings['bimun_edition'] || 'BIMUN XXV';
+    slogan = settings['slogan'] || settings['hero_slogan'] || 'Debate, liderazgo y diplomacia internacional.';
     const tagline = settings['hero_tagline'] || '';
-    const institution = settings['institution_name'] || 'Fundación Colegio Bilingüe de Valledupar';
+    institution = settings['institution_name'] || 'Fundación Colegio Bilingüe de Valledupar';
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('La API Key de Gemini no está configurada.');
+    }
 
     let contentContext = `Nombre del Evento: ${eventName}\nLema/Slogan: ${slogan}\nSubtítulo/Tagline: ${tagline}\nInstitución Organizadora: ${institution}\n\nSecciones de Información:\n`;
     for (const abt of rawAbout) {
@@ -2253,7 +2254,7 @@ REGLAS DE GENERACIÓN DE SEO:
     let response;
     try {
       response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -2274,9 +2275,9 @@ REGLAS DE GENERACIÓN DE SEO:
         }
       });
     } catch (firstErr: any) {
-      console.warn('First attempt with gemini-3.8-flash failed, trying fallback to gemini-flash-latest...', firstErr.message || firstErr);
+      console.warn('First attempt with gemini-2.5-flash failed, trying fallback to gemini-1.5-flash...', firstErr.message || firstErr);
       response = await ai.models.generateContent({
-        model: 'gemini-flash-latest',
+        model: 'gemini-1.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -2306,16 +2307,24 @@ REGLAS DE GENERACIÓN DE SEO:
     const parsedResult = JSON.parse(text.trim());
     res.json({
       success: true,
+      is_fallback: false,
       meta_title: parsedResult.meta_title,
       meta_description: parsedResult.meta_description
     });
 
   } catch (err: any) {
-    console.error('Error in Gemini SEO generator:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Error al generar sugerencias de SEO con la Inteligencia Artificial.',
-      details: err.message
+    console.warn('[Gemini SEO Fallback Triggered] falling back to heuristic generation:', err.message);
+    // Calculate high-quality metadata locally to make sure it never fails!
+    const meta_title = `${eventName} | Modelo de Naciones Unidas - ${institution}`.slice(0, 60);
+    const defaultSlogan = slogan || 'Debate, liderazgo y diplomacia internacional en Valledupar.';
+    const meta_description = `Participa en el ${eventName}, el prestigioso Modelo de Naciones Unidas del ${institution}. ${defaultSlogan} ¡Inscríbete hoy!`.slice(0, 160);
+
+    res.json({
+      success: true,
+      is_fallback: true,
+      fallback_reason: err.message || 'Error de conexión con la IA de Google',
+      meta_title,
+      meta_description
     });
   }
 });

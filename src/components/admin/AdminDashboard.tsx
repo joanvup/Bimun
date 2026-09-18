@@ -119,7 +119,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             meta_description: data.meta_description,
           };
         });
-        showStatus('Sugerencias de SEO generadas exitosamente con Gemini.');
+        if (data.is_fallback) {
+          showStatus('Sugerencias locales optimizadas con éxito. (API de Gemini inactiva, usando motor heurístico local)', 'success');
+        } else {
+          showStatus('Sugerencias de SEO generadas exitosamente con la IA de Gemini.');
+        }
       } else {
         showStatus(data.error || 'Error al generar sugerencias de SEO con Gemini', 'error');
       }
@@ -740,7 +744,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {[
             { id: 'overview', label: 'Resumen y Métricas', icon: Shield },
             { id: 'settings', label: 'Evento y Secciones', icon: Settings },
-            { id: 'seo', label: 'SEO y Metadatos', icon: Globe },
+            ...(user.role === 'admin' || user.role === 'superadmin'
+              ? [{ id: 'seo', label: 'SEO y Metadatos', icon: Globe }]
+              : []),
             { id: 'committees', label: 'Comisiones', icon: BookOpen, badge: committees.length },
             { id: 'delegations', label: 'Países y Cupos', icon: Globe, badge: delegations.length },
             { id: 'registrations', label: 'Inscripciones', icon: UserCheck, badge: registrations.filter((r) => r.status === 'pending').length },
@@ -1456,7 +1462,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
 
           {/* TAB: SEO & METADATOS (applet-seo) */}
-          {activeTab === 'seo' && settings && (
+          {activeTab === 'seo' && (user.role === 'admin' || user.role === 'superadmin') && settings && (
             <div className="max-w-4xl space-y-6 animate-in fade-in-50 duration-200">
               <div className="border-b border-slate-800 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
