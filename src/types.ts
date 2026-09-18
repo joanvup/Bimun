@@ -46,6 +46,12 @@ export interface BIMUNSettings {
   tradition_years?: string;
   maintenance_mode?: boolean;
   maintenance_message?: string;
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
+  og_image_url?: string;
+  twitter_handle?: string;
+  schema_json?: string;
 }
 
 export interface AboutSection {

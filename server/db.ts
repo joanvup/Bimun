@@ -522,6 +522,12 @@ function seedInitialData(db: Database): void {
     ],
     ['maintenance_mode', 'false'],
     ['maintenance_message', 'Nuestra plataforma está experimentando una actualización de servidores para la XXVII edición de BIMUN. Estaremos de vuelta muy pronto. Gracias por tu paciencia.'],
+    ['meta_title', 'BIMUN – Modelo de Naciones Unidas | Colegio Bilingüe de Valledupar'],
+    ['meta_description', 'Únete al modelo escolar de naciones unidas referente del Caribe colombiano. Debates académicos de excelencia, diplomacia y liderazgo en la XXVII edición de BIMUN.'],
+    ['meta_keywords', 'BIMUN, Modelo de Naciones Unidas, Colegio Bilingüe, Valledupar, Debate, Diplomacia, Delegaciones, Cesar'],
+    ['og_image_url', 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&h=630&q=80'],
+    ['twitter_handle', '@BimunValledupar'],
+    ['schema_json', '{\n  "@context": "https://schema.org",\n  "@type": "WebApplication",\n  "name": "BIMUN - Plataforma Académica",\n  "applicationCategory": "EducationalApplication",\n  "operatingSystem": "All",\n  "description": "Plataforma oficial del Modelo de Naciones Unidas de la Fundación Colegio Bilingüe de Valledupar (BIMUN).",\n  "offers": {\n    "@type": "Offer",\n    "price": "0",\n    "priceCurrency": "COP"\n  }\n}'],
   ];
 
   for (const [key, val] of defaultSettings) {

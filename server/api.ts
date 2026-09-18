@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { GoogleGenAI, Type } from '@google/genai';
 import { executeQueryAll, executeQueryOne, executeRunSql, initializeDatabaseManager, ensureDefaultAdmin } from './dbManager.ts';
 import {
   getDb,
@@ -1059,6 +1060,96 @@ apiRouter.delete('/admin/documents/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Document Categories CRUD (MySQL compatible)
+apiRouter.get('/admin/documents/categories', authMiddleware, async (req, res) => {
+  try {
+    const row = await executeQueryOne<{ value: string }>(`SELECT value FROM settings WHERE key = 'document_categories';`);
+    let categories: string[] = [];
+    if (row && row.value) {
+      try {
+        categories = JSON.parse(row.value);
+      } catch {
+        categories = [];
+      }
+    }
+    if (!categories || categories.length === 0) {
+      categories = ['Protocolo', 'Académico', 'Plantillas', 'Inscripción', 'Normativa'];
+    }
+
+    // Collect counts per category
+    const counts = await executeQueryAll<{ category: string; count: number }>(
+      'SELECT category, COUNT(*) as count FROM documents GROUP BY category;'
+    );
+    const categoryCounts: Record<string, number> = {};
+    for (const c of counts) {
+      if (c.category) {
+        categoryCounts[c.category] = c.count;
+        if (!categories.includes(c.category)) {
+          categories.push(c.category);
+        }
+      }
+    }
+
+    res.json({ categories, categoryCounts });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener categorías de los documentos', details: err.message });
+  }
+});
+
+apiRouter.post('/admin/documents/categories', authMiddleware, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (!['admin', 'superadmin', 'coordinador', 'academico'].includes(user?.role)) {
+      return res.status(403).json({ error: 'No tienes permisos para modificar categorías de documentos.' });
+    }
+
+    const { categories, renameFrom, renameTo, deleteCategory, reassignTo } = req.body;
+    if (!Array.isArray(categories) || categories.length === 0) {
+      return res.status(400).json({ error: 'Debe proporcionar una lista válida de categorías.' });
+    }
+
+    const cleanedCategories = Array.from(
+      new Set(
+        categories
+          .map((c: string) => (typeof c === 'string' ? c.trim() : ''))
+          .filter(Boolean)
+      )
+    );
+
+    // Handle renaming category across existing documents
+    if (renameFrom && renameTo && renameFrom.trim() !== renameTo.trim()) {
+      await executeRunSql('UPDATE documents SET category = ? WHERE category = ?;', [renameTo.trim(), renameFrom.trim()]);
+    }
+
+    // Handle deleting category and reassigning documents
+    if (deleteCategory) {
+      const fallbackTarget = reassignTo ? reassignTo.trim() : (cleanedCategories[0] || 'General');
+      await executeRunSql('UPDATE documents SET category = ? WHERE category = ?;', [fallbackTarget, deleteCategory.trim()]);
+    }
+
+    const now = new Date().toISOString();
+    await executeRunSql('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?);', [
+      'document_categories',
+      JSON.stringify(cleanedCategories),
+      now,
+    ]);
+
+    const counts = await executeQueryAll<{ category: string; count: number }>(
+      'SELECT category, COUNT(*) as count FROM documents GROUP BY category;'
+    );
+    const categoryCounts: Record<string, number> = {};
+    for (const c of counts) {
+      if (c.category) {
+        categoryCounts[c.category] = c.count;
+      }
+    }
+
+    res.json({ success: true, categories: cleanedCategories, categoryCounts });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al actualizar categorías de documentos', details: err.message });
+  }
+});
+
 // Gallery CRUD & Categories
 apiRouter.get('/admin/gallery/categories', authMiddleware, async (req, res) => {
   try {
@@ -2041,6 +2132,144 @@ apiRouter.post('/admin/smtp/send-test', authMiddleware, adminOnlyMiddleware, asy
     }
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// AI-generated suggestions for meta_title and meta_description using Gemini 3.8 Flash (applet-seo + gemini-api)
+apiRouter.post('/admin/suggest-seo', authMiddleware, canEditInstitutionalContent, async (req, res) => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'La API Key de Gemini no está configurada en las variables de entorno.',
+        details: 'Por favor, asocie su clave en la sección de configuración de secretos de AI Studio.'
+      });
+    }
+
+    // Initialize database connection
+    await getDb();
+
+    // Query active settings
+    const rawSettings = await executeQueryAll<{ key: string; value: string }>('SELECT key, value FROM settings;');
+    const settings: Record<string, string> = {};
+    for (const r of rawSettings) {
+      settings[r.key] = r.value;
+    }
+
+    // Query institutional about sections
+    const rawAbout = await executeQueryAll<{ title: string; subtitle: string; content: string }>(
+      'SELECT title, subtitle, content FROM about_sections WHERE is_active = 1;'
+    );
+
+    // Query committees
+    const rawCommittees = await executeQueryAll<{ name: string; abbreviation: string; topic_a: string }>(
+      "SELECT name, abbreviation, topic_a FROM committees WHERE status = 'active';"
+    );
+
+    // Construct metadata summary of the event for Gemini
+    const eventName = settings['bimun_name'] || 'BIMUN';
+    const slogan = settings['slogan'] || '';
+    const tagline = settings['hero_tagline'] || '';
+    const institution = settings['institution_name'] || 'Fundación Colegio Bilingüe de Valledupar';
+
+    let contentContext = `Nombre del Evento: ${eventName}\nLema/Slogan: ${slogan}\nSubtítulo/Tagline: ${tagline}\nInstitución Organizadora: ${institution}\n\nSecciones de Información:\n`;
+    for (const abt of rawAbout) {
+      contentContext += `- ${abt.title}: ${abt.subtitle}. ${abt.content.slice(0, 150)}...\n`;
+    }
+
+    contentContext += `\nComisiones/Comités Activos:\n`;
+    for (const com of rawCommittees) {
+      contentContext += `- ${com.name} (${com.abbreviation}): ${com.topic_a.slice(0, 150)}\n`;
+    }
+
+    // Instantiate Gemini SDK with proper parameters and User-Agent
+    const ai = new GoogleGenAI({
+      apiKey: apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    const prompt = `Eres un estratega experto en marketing digital, redacción web y SEO para eventos académicos internacionales.
+Suministrado el siguiente contexto real sobre el Modelo de Naciones Unidas "${eventName}" (BIMUN) de la institución "${institution}", tu tarea es generar un Meta Title y una Meta Description optimizados para SEO para la página de inicio.
+
+CONTEXTO REAL DEL EVENTO:
+${contentContext}
+
+REGLAS DE GENERACIÓN DE SEO:
+1. El "meta_title" debe tener entre 30 y 60 caracteres. Debe ser atractivo, incluir el nombre "${eventName}", el Colegio Bilingüe de Valledupar, y resumir el evento de forma persuasiva.
+2. La "meta_description" debe tener entre 120 y 160 caracteres. Debe capturar la esencia del modelo, usar palabras clave como debate, liderazgo, diplomacia, Valledupar, etc., e invitar a delegados a inscribirse o participar con un claro llamado a la acción.
+3. El resultado debe venir estrictamente en español, con excelente ortografía y redacción impecable. Evita clichés de inteligencia artificial.`;
+
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              meta_title: {
+                type: Type.STRING,
+                description: 'Sugerencia de título meta (Meta Title) en español para SEO de máximo 60 caracteres.'
+              },
+              meta_description: {
+                type: Type.STRING,
+                description: 'Sugerencia de descripción meta (Meta Description) en español para SEO de entre 120 y 160 caracteres.'
+              }
+            },
+            required: ['meta_title', 'meta_description']
+          }
+        }
+      });
+    } catch (firstErr: any) {
+      console.warn('First attempt with gemini-3.8-flash failed, trying fallback to gemini-flash-latest...', firstErr.message || firstErr);
+      response = await ai.models.generateContent({
+        model: 'gemini-flash-latest',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              meta_title: {
+                type: Type.STRING,
+                description: 'Sugerencia de título meta (Meta Title) en español para SEO de máximo 60 caracteres.'
+              },
+              meta_description: {
+                type: Type.STRING,
+                description: 'Sugerencia de descripción meta (Meta Description) en español para SEO de entre 120 y 160 caracteres.'
+              }
+            },
+            required: ['meta_title', 'meta_description']
+          }
+        }
+      });
+    }
+
+    const text = response.text;
+    if (!text) {
+      throw new Error('La respuesta generada por Gemini fue nula o vacía.');
+    }
+
+    const parsedResult = JSON.parse(text.trim());
+    res.json({
+      success: true,
+      meta_title: parsedResult.meta_title,
+      meta_description: parsedResult.meta_description
+    });
+
+  } catch (err: any) {
+    console.error('Error in Gemini SEO generator:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Error al generar sugerencias de SEO con la Inteligencia Artificial.',
+      details: err.message
+    });
   }
 });
 

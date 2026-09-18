@@ -4,10 +4,11 @@ import {
   Image, Newspaper, UserCheck, Key, Database, LogOut, Plus, Trash2,
   Edit2, Copy, Check, X, RefreshCw, Download, AlertCircle, Eye, EyeOff,
   Sparkles, RotateCcw, Mail, Lock, Images, Tag, SlidersHorizontal,
-  CheckSquare, Square, Clock
+  CheckSquare, Square, Clock, Loader2
 } from 'lucide-react';
 import { ImageUploadField } from '../common/ImageUploadField.tsx';
 import { VideoUploadField } from '../common/VideoUploadField.tsx';
+import { DocumentUploadField } from '../common/DocumentUploadField.tsx';
 import { DatabaseSettingsSection } from './DatabaseSettingsSection.tsx';
 import { SmtpSettingsSection } from './SmtpSettingsSection.tsx';
 import { UsersManagementSection } from './UsersManagementSection.tsx';
@@ -15,6 +16,7 @@ import { AboutCardItem } from './AboutCardItem.tsx';
 import { AboutEditModal } from './AboutEditModal.tsx';
 import { GalleryBatchUploadModal } from './GalleryBatchUploadModal.tsx';
 import { GalleryCategoryManagerModal } from './GalleryCategoryManagerModal.tsx';
+import { DocumentCategoryManagerModal } from './DocumentCategoryManagerModal.tsx';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
 import { EditionsAndBackupsSection } from './EditionsAndBackupsSection.tsx';
 import {
@@ -39,7 +41,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'settings' | 'committees' | 'delegations' | 'registrations' | 'about' | 'schedule' | 'documents' | 'gallery' | 'team' | 'news' | 'users' | 'security' | 'editions'
+    'overview' | 'settings' | 'seo' | 'committees' | 'delegations' | 'registrations' | 'about' | 'schedule' | 'documents' | 'gallery' | 'team' | 'news' | 'users' | 'security' | 'editions'
   >('overview');
 
   const [stats, setStats] = useState<any>(null);
@@ -72,6 +74,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     'Debate', 'Protocolo', 'Negociación', 'Crisis', 'Premiación', 'Campus', 'Social', 'Inauguración', 'Clausura'
   ]);
   const [galleryCategoryCounts, setGalleryCategoryCounts] = useState<Record<string, number>>({});
+  const [documentCategories, setDocumentCategories] = useState<string[]>([
+    'Protocolo', 'Académico', 'Plantillas', 'Inscripción', 'Normativa'
+  ]);
+  const [documentCategoryCounts, setDocumentCategoryCounts] = useState<Record<string, number>>({});
+  const [docCategoryManagerModalOpen, setDocCategoryManagerModalOpen] = useState(false);
   const [batchUploadModalOpen, setBatchUploadModalOpen] = useState(false);
   const [categoryManagerModalOpen, setCategoryManagerModalOpen] = useState(false);
   const [selectedGalleryCategoryFilter, setSelectedGalleryCategoryFilter] = useState<string>('all');
@@ -92,6 +99,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isSavingAboutModal, setIsSavingAboutModal] = useState(false);
   const [isRestoringAbout, setIsRestoringAbout] = useState(false);
   const [confirmResetAboutModalOpen, setConfirmResetAboutModalOpen] = useState(false);
+
+  // Gemini SEO generator state
+  const [generatingSeo, setGeneratingSeo] = useState(false);
+
+  const handleSuggestSeo = async () => {
+    setGeneratingSeo(true);
+    try {
+      const res = await authFetch('/api/admin/suggest-seo', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSettings((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            meta_title: data.meta_title,
+            meta_description: data.meta_description,
+          };
+        });
+        showStatus('Sugerencias de SEO generadas exitosamente con Gemini.');
+      } else {
+        showStatus(data.error || 'Error al generar sugerencias de SEO con Gemini', 'error');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Error al conectar con el servidor', 'error');
+    } finally {
+      setGeneratingSeo(false);
+    }
+  };
 
   // Global delete confirmation state
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -143,6 +180,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         docRes,
         galRes,
         galCatsRes,
+        docCatsRes,
         tmRes,
         nwRes,
       ] = await Promise.all([
@@ -157,6 +195,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         authFetch('/api/admin/documents'),
         authFetch('/api/admin/gallery'),
         authFetch('/api/admin/gallery/categories'),
+        authFetch('/api/admin/documents/categories'),
         authFetch('/api/admin/team'),
         authFetch('/api/admin/news'),
       ]);
@@ -177,6 +216,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           setGalleryCategories(catData.categories);
           if (catData.categoryCounts) {
             setGalleryCategoryCounts(catData.categoryCounts);
+          }
+        }
+      }
+      if (docCatsRes.ok) {
+        const docCatData = await docCatsRes.json();
+        if (docCatData && docCatData.categories) {
+          setDocumentCategories(docCatData.categories);
+          if (docCatData.categoryCounts) {
+            setDocumentCategoryCounts(docCatData.categoryCounts);
           }
         }
       }
@@ -692,6 +740,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {[
             { id: 'overview', label: 'Resumen y Métricas', icon: Shield },
             { id: 'settings', label: 'Evento y Secciones', icon: Settings },
+            { id: 'seo', label: 'SEO y Metadatos', icon: Globe },
             { id: 'committees', label: 'Comisiones', icon: BookOpen, badge: committees.length },
             { id: 'delegations', label: 'Países y Cupos', icon: Globe, badge: delegations.length },
             { id: 'registrations', label: 'Inscripciones', icon: UserCheck, badge: registrations.filter((r) => r.status === 'pending').length },
@@ -1406,6 +1455,262 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
+          {/* TAB: SEO & METADATOS (applet-seo) */}
+          {activeTab === 'seo' && settings && (
+            <div className="max-w-4xl space-y-6 animate-in fade-in-50 duration-200">
+              <div className="border-b border-slate-800 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-display text-2xl font-bold text-white flex items-center gap-2">
+                    <Globe className="w-6 h-6 text-blue-500" />
+                    <span>Configuración SEO y Tarjetas Sociales</span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Optimiza la visibilidad de BIMUN en Google y personaliza la apariencia al compartir enlaces en redes sociales.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-6">
+                {/* 1. Meta Tags Básicos */}
+                <div className="bg-slate-950/60 rounded-2xl border border-slate-800 p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-800/60">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4" />
+                      Metaetiquetas Básicas (Motores de Búsqueda)
+                    </h3>
+
+                    <button
+                      type="button"
+                      disabled={generatingSeo}
+                      onClick={handleSuggestSeo}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer self-start sm:self-auto"
+                    >
+                      {generatingSeo ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Generando sugerencia...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                          <span>Sugerir con Gemini IA</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-semibold text-slate-300">Meta Título (Meta Title)</label>
+                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                          (settings.meta_title?.length || 0) >= 30 && (settings.meta_title?.length || 0) <= 60
+                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                            : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                        }`}>
+                          {(settings.meta_title?.length || 0)} / 60 caracteres (Óptimo: 30-60)
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={settings.meta_title || ''}
+                        onChange={(e) => setSettings({ ...settings, meta_title: e.target.value })}
+                        placeholder="Ej: BIMUN 2026 | XXVII Modelo de Naciones Unidas del Colegio Bilingüe"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-blue-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Aparece en la pestaña del navegador y como título principal en los resultados de búsqueda de Google.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-semibold text-slate-300">Meta Descripción (Meta Description)</label>
+                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                          (settings.meta_description?.length || 0) >= 120 && (settings.meta_description?.length || 0) <= 160
+                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                            : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                        }`}>
+                          {(settings.meta_description?.length || 0)} / 160 caracteres (Óptimo: 120-160)
+                        </span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={settings.meta_description || ''}
+                        onChange={(e) => setSettings({ ...settings, meta_description: e.target.value })}
+                        placeholder="Ej: Participa en el modelo escolar de naciones unidas de referencia del Caribe colombiano. Debates de alta calidad académica en Valledupar, Cesar."
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-blue-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Resumen descriptivo del sitio web que se muestra debajo del título en los resultados de búsqueda.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300">Palabras Clave (Meta Keywords)</label>
+                      <input
+                        type="text"
+                        value={settings.meta_keywords || ''}
+                        onChange={(e) => setSettings({ ...settings, meta_keywords: e.target.value })}
+                        placeholder="Ej: BIMUN, Modelo de Naciones Unidas, Colegio Bilingüe, Valledupar, Debate, Diplomacia"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-blue-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Lista de términos clave separados por comas para indicar los temas principales del modelo a buscadores alternativos.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Redes Sociales (OpenGraph & Twitter) */}
+                <div className="bg-slate-950/60 rounded-2xl border border-slate-800 p-5 space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                    <Image className="w-4 h-4 animate-pulse" />
+                    Tarjetas Sociales (OpenGraph & Twitter Cards)
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-300">Usuario de Twitter / X (Opcional)</label>
+                        <input
+                          type="text"
+                          value={settings.twitter_handle || ''}
+                          onChange={(e) => setSettings({ ...settings, twitter_handle: e.target.value })}
+                          placeholder="Ej: @BimunValledupar"
+                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-blue-500 focus:outline-none"
+                        />
+                        <p className="text-[10px] text-slate-500">
+                          Asocia las tarjetas compartidas en Twitter/X con la cuenta institucional de tu modelo.
+                        </p>
+                      </div>
+
+                      {/* Visual Live Card Preview */}
+                      <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                          Vista Previa de Enlace Compartido (Card Live Preview)
+                        </span>
+                        <div className="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80">
+                          {settings.og_image_url ? (
+                            <img
+                              src={settings.og_image_url}
+                              alt="Live Preview"
+                              className="w-full h-36 object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-full h-36 bg-slate-900 flex flex-col items-center justify-center p-4 text-slate-600 text-xs text-center border-b border-slate-800">
+                              <Image className="w-8 h-8 mb-1.5 opacity-40" />
+                              Sin Imagen Configurada (Se usará banner por defecto)
+                            </div>
+                          )}
+                          <div className="p-3 space-y-1 text-left">
+                            <span className="text-[10px] font-mono text-blue-400 uppercase tracking-tight block">
+                              {window.location.host || 'bimun.colegiobilingue.edu.co'}
+                            </span>
+                            <span className="text-xs font-bold text-white block line-clamp-1">
+                              {settings.meta_title || settings.bimun_name || 'BIMUN Model'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 line-clamp-2">
+                              {settings.meta_description || 'Descripción del modelo para redes sociales...'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <ImageUploadField
+                        label="Cargar Imagen de Tarjeta Social (OpenGraph Image)"
+                        value={settings.og_image_url || ''}
+                        onChange={(val) => setSettings({ ...settings, og_image_url: val })}
+                        helperText="Se recomienda un tamaño de 1200x630 píxeles para una visualización nítida en WhatsApp, Telegram, Facebook, Slack y X."
+                        aspectRatio="banner"
+                        maxDimensions={{ width: 1200, height: 630 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Schema.org Datos Estructurados */}
+                <div className="bg-slate-950/60 rounded-2xl border border-slate-800 p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-slate-800">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        Schema.org JSON-LD (Datos Estructurados Avanzados)
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Inyecta datos enriquecidos en formato JSON-LD para lograr fragmentos destacados en Google (Rich Snippets).
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaultSchema = {
+                          "@context": "https://schema.org",
+                          "@type": "WebApplication",
+                          "name": settings.bimun_name || "BIMUN - Plataforma Académica",
+                          "applicationCategory": "EducationalApplication",
+                          "operatingSystem": "All",
+                          "description": settings.meta_description || "Plataforma oficial del Modelo de Naciones Unidas del Colegio Bilingüe.",
+                          "offers": {
+                            "@type": "Offer",
+                            "price": "0",
+                            "priceCurrency": "COP"
+                          }
+                        };
+                        setSettings({ ...settings, schema_json: JSON.stringify(defaultSchema, null, 2) });
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-slate-800 transition-colors"
+                    >
+                      Restaurar Plantilla
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <textarea
+                      rows={8}
+                      value={settings.schema_json || ''}
+                      onChange={(e) => setSettings({ ...settings, schema_json: e.target.value })}
+                      placeholder={`{\n  "@context": "https://schema.org",\n  "@type": "WebApplication"\n}`}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-amber-300 focus:border-amber-500 focus:outline-none"
+                    />
+                    {(() => {
+                      if (!settings.schema_json) return null;
+                      try {
+                        JSON.parse(settings.schema_json);
+                        return (
+                          <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5" />
+                            Código JSON con formato válido para Schema.org.
+                          </p>
+                        );
+                      } catch (err: any) {
+                        return (
+                          <p className="text-[10px] text-rose-400 font-semibold flex items-center gap-1.5">
+                            <X className="w-3.5 h-3.5" />
+                            Error de sintaxis JSON: {err.message}
+                          </p>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-600/30"
+                  >
+                    Guardar Configuración SEO
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
           {/* TAB 3: COMMITTEES */}
           {activeTab === 'committees' && (
             <div className="space-y-6 max-w-6xl">
@@ -1997,23 +2302,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <h2 className="font-display text-2xl font-bold text-white">Documentos y Guías</h2>
                   <p className="text-xs text-slate-400">Administra los manuales descargables en el portal.</p>
                 </div>
-                <button
-                  onClick={() =>
-                    setEditingDoc({
-                      title: '',
-                      category: 'Protocolo',
-                      file_url: '#',
-                      description: '',
-                      file_size: '1.5 MB',
-                      is_featured: 1,
-                      sort_order: documents.length + 1,
-                    })
-                  }
-                  className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nuevo Documento</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDocCategoryManagerModalOpen(true)}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all border border-slate-700"
+                  >
+                    <Tag className="w-4 h-4 text-amber-400" />
+                    <span>Categorías</span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      setEditingDoc({
+                        title: '',
+                        category: documentCategories[0] || 'Protocolo',
+                        file_url: '',
+                        description: '',
+                        file_size: '',
+                        is_featured: 1,
+                        sort_order: documents.length + 1,
+                      })
+                    }
+                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 hover:bg-blue-500 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Nuevo Documento</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2025,39 +2339,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <p className="text-xs text-slate-400 mt-1">{doc.description}</p>
                     </div>
                     <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-mono">{doc.file_size}</span>
-                      <button
-                        onClick={() => {
-                          setDeleteConfirmation({
-                            isOpen: true,
-                            title: '¿Eliminar Documento o Guía?',
-                            itemName: `${doc.title} (${doc.category})`,
-                            description: 'Los delegados ya no podrán visualizar ni descargar este documento desde el portal.',
-                            onConfirm: async () => {
-                              setIsDeletingItem(true);
-                              try {
-                                const res = await authFetch(`/api/admin/documents/${doc.id}`, { method: 'DELETE' });
-                                if (res.ok) {
-                                  setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
-                                  showStatus('Documento eliminado');
-                                  setDeleteConfirmation(null);
-                                  await loadAllAdminData();
-                                  onDataUpdated();
-                                } else {
-                                  showStatus('Error al eliminar documento', 'error');
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-slate-500 font-mono shrink-0">{doc.file_size || 'N/A'}</span>
+                        {doc.file_url && doc.file_url !== '#' && (
+                          <a
+                            href={doc.file_url}
+                            target="_blank"
+                            referrerPolicy="no-referrer"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-blue-400 hover:text-blue-300 hover:underline truncate"
+                          >
+                            Ver PDF
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingDoc(doc)}
+                          className="p-1 rounded text-blue-400 hover:bg-blue-950/60"
+                          title="Editar Documento"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteConfirmation({
+                              isOpen: true,
+                              title: '¿Eliminar Documento o Guía?',
+                              itemName: `${doc.title} (${doc.category})`,
+                              description: 'Los delegados ya no podrán visualizar ni descargar este documento desde el portal.',
+                              onConfirm: async () => {
+                                setIsDeletingItem(true);
+                                try {
+                                  const res = await authFetch(`/api/admin/documents/${doc.id}`, { method: 'DELETE' });
+                                  if (res.ok) {
+                                    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+                                    showStatus('Documento eliminado');
+                                    setDeleteConfirmation(null);
+                                    await loadAllAdminData();
+                                    onDataUpdated();
+                                  } else {
+                                    showStatus('Error al eliminar documento', 'error');
+                                  }
+                                } catch (err: any) {
+                                  showStatus(err.message, 'error');
+                                } finally {
+                                  setIsDeletingItem(false);
                                 }
-                              } catch (err: any) {
-                                showStatus(err.message, 'error');
-                              } finally {
-                                setIsDeletingItem(false);
-                              }
-                            },
-                          });
-                        }}
-                        className="p-1 rounded text-rose-400 hover:bg-rose-950"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                              },
+                            });
+                          }}
+                          className="p-1 rounded text-rose-400 hover:bg-rose-950"
+                          title="Eliminar Documento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -3383,6 +3720,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!editingDoc.file_url || editingDoc.file_url === '#') {
+                  showStatus('Por favor adjunte un archivo PDF para el documento.', 'error');
+                  return;
+                }
                 const isNew = !editingDoc.id;
                 const url = isNew ? '/api/admin/documents' : `/api/admin/documents/${editingDoc.id}`;
                 await authFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(editingDoc) });
@@ -3391,7 +3732,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 loadAllAdminData();
                 onDataUpdated();
               }}
-              className="space-y-3"
+              className="space-y-4"
             >
               <div className="space-y-1">
                 <label className="text-xs text-slate-400">Título del Documento</label>
@@ -3407,15 +3748,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="space-y-1">
                 <label className="text-xs text-slate-400">Categoría</label>
                 <select
-                  value={editingDoc.category || 'Protocolo'}
+                  value={editingDoc.category || (documentCategories[0] || 'Protocolo')}
                   onChange={(e) => setEditingDoc({ ...editingDoc, category: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
                 >
-                  <option value="Protocolo">Protocolo</option>
-                  <option value="Académico">Académico</option>
-                  <option value="Plantillas">Plantillas</option>
-                  <option value="Inscripción">Inscripción</option>
-                  <option value="Normativa">Normativa</option>
+                  {documentCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -3429,6 +3770,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
+              {/* Upload Field for PDF documents with size and type checks */}
+              <DocumentUploadField
+                label="Cargar Archivo PDF"
+                fileUrl={editingDoc.file_url || ''}
+                fileSize={editingDoc.file_size || ''}
+                maxSizeMb={10}
+                onChange={(url, size) => setEditingDoc({ ...editingDoc, file_url: url, file_size: size })}
+              />
+
               <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
                 <button
                   type="button"
@@ -3439,7 +3789,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-colors"
                 >
                   Guardar
                 </button>
@@ -3697,6 +4047,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onClose={() => setCategoryManagerModalOpen(false)}
         categories={galleryCategories}
         categoryCounts={galleryCategoryCounts}
+        onCategoriesUpdated={() => {
+          loadAllAdminData();
+          onDataUpdated();
+        }}
+        authFetch={authFetch}
+        showStatus={showStatus}
+      />
+
+      {/* DOCUMENT CATEGORY MANAGER MODAL */}
+      <DocumentCategoryManagerModal
+        isOpen={docCategoryManagerModalOpen}
+        onClose={() => setDocCategoryManagerModalOpen(false)}
+        categories={documentCategories}
+        categoryCounts={documentCategoryCounts}
         onCategoriesUpdated={() => {
           loadAllAdminData();
           onDataUpdated();

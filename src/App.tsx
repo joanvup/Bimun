@@ -101,6 +101,83 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
+  // Dynamic SEO and Social Metadata synchronization with browser Head (applet-seo)
+  useEffect(() => {
+    if (!data?.settings) return;
+    const settings = data.settings;
+
+    // 1. Dynamic document/page Title
+    if (settings.meta_title) {
+      document.title = settings.meta_title;
+    } else if (settings.bimun_name) {
+      document.title = `${settings.bimun_name} – ${settings.slogan || 'Modelo de Naciones Unidas'}`;
+    }
+
+    const updateMetaTag = (selector: string, attributeName: string, attributeValue: string, contentValue: string) => {
+      let element = document.querySelector(selector);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attributeName, attributeValue);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', contentValue);
+    };
+
+    // 2. Meta description & keywords
+    if (settings.meta_description) {
+      updateMetaTag('meta[name="description"]', 'name', 'description', settings.meta_description);
+    }
+    if (settings.meta_keywords) {
+      updateMetaTag('meta[name="keywords"]', 'name', 'keywords', settings.meta_keywords);
+    }
+
+    // 3. OpenGraph tags
+    if (settings.meta_title) {
+      updateMetaTag('meta[property="og:title"]', 'property', 'og:title', settings.meta_title);
+    }
+    if (settings.meta_description) {
+      updateMetaTag('meta[property="og:description"]', 'property', 'og:description', settings.meta_description);
+    }
+    if (settings.og_image_url) {
+      updateMetaTag('meta[property="og:image"]', 'property', 'og:image', settings.og_image_url);
+    }
+    updateMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
+    updateMetaTag('meta[property="og:url"]', 'property', 'og:url', window.location.origin + window.location.pathname);
+
+    // 4. Twitter tags
+    updateMetaTag('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+    if (settings.meta_title) {
+      updateMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', settings.meta_title);
+    }
+    if (settings.meta_description) {
+      updateMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', settings.meta_description);
+    }
+    if (settings.og_image_url) {
+      updateMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', settings.og_image_url);
+    }
+    if (settings.twitter_handle) {
+      updateMetaTag('meta[name="twitter:creator"]', 'name', 'twitter:creator', settings.twitter_handle);
+    }
+
+    // 5. Schema.org JSON-LD structured data injection
+    if (settings.schema_json) {
+      let scriptElement = document.querySelector('script[id="bimun-seo-jsonld"]');
+      if (!scriptElement) {
+        scriptElement = document.createElement('script');
+        scriptElement.setAttribute('type', 'application/ld+json');
+        scriptElement.setAttribute('id', 'bimun-seo-jsonld');
+        document.head.appendChild(scriptElement);
+      }
+      try {
+        // Validate JSON before injection
+        const parsed = JSON.parse(settings.schema_json);
+        scriptElement.textContent = JSON.stringify(parsed, null, 2);
+      } catch (err) {
+        scriptElement.textContent = settings.schema_json;
+      }
+    }
+  }, [data?.settings]);
+
   const handleLoginSuccess = (token: string, user: AdminUser) => {
     setAdminToken(token);
     setAdminUser(user);
