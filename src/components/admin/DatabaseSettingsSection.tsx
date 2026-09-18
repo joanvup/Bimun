@@ -4,6 +4,7 @@ import {
   ArrowRightLeft, ShieldCheck, Download, HardDrive, Info
 } from 'lucide-react';
 import { DatabaseStatus, DatabaseConfig, DatabaseEngineType } from '../../types.ts';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
 
 interface DatabaseSettingsSectionProps {
   token: string;
@@ -34,6 +35,8 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
   const [migrating, setMigrating] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [showRevertModal, setShowRevertModal] = useState(false);
+  const [showMigrateModal, setShowMigrateModal] = useState(false);
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
     return fetch(url, {
@@ -136,7 +139,6 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
 
   // Revert quickly to SQLite
   const handleRevertToSqlite = async () => {
-    if (!window.confirm('¿Deseas activar inmediatamente la base de datos local SQLite?')) return;
     setSaving(true);
     try {
       const res = await authFetch('/api/admin/db-switch', {
@@ -145,10 +147,13 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        setShowRevertModal(false);
         onStatusMessage('Cambiado a SQLite Local exitosamente.');
         setDbConfig((prev) => ({ ...prev, type: 'sqlite' }));
         setDbStatus(data.status);
         onDataUpdated();
+      } else {
+        onStatusMessage(data.error || 'Error al cambiar a SQLite.', 'error');
       }
     } catch (err: any) {
       onStatusMessage(err.message, 'error');
@@ -159,16 +164,6 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
 
   // Migrate Data from SQLite to Target Engine
   const handleMigrateData = async () => {
-    if (
-      !window.confirm(
-        `¿Deseas transferir y sincronizar todos los datos actuales (comisiones, países, noticias, inscripciones, etc.) hacia ${
-          dbConfig.type === 'postgres' ? 'PostgreSQL' : 'MySQL'
-        }?`
-      )
-    ) {
-      return;
-    }
-
     setMigrating(true);
     try {
       const res = await authFetch('/api/admin/db-migrate', {
@@ -177,6 +172,7 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        setShowMigrateModal(false);
         onStatusMessage(data.message);
         onDataUpdated();
       } else {
@@ -501,7 +497,7 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
             {dbStatus?.activeType !== 'sqlite' && (
               <button
                 type="button"
-                onClick={handleRevertToSqlite}
+                onClick={() => setShowRevertModal(true)}
                 disabled={saving}
                 className="px-3.5 py-2 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-semibold flex items-center gap-1.5"
               >
@@ -549,7 +545,7 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
           <div className="flex justify-end pt-1">
             <button
               type="button"
-              onClick={handleMigrateData}
+              onClick={() => setShowMigrateModal(true)}
               disabled={migrating}
               className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-md shadow-emerald-600/30 disabled:opacity-50"
             >
@@ -559,6 +555,30 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
           </div>
         </div>
       )}
+
+      {/* Modal for Reverting to SQLite */}
+      <ConfirmDeleteModal
+        isOpen={showRevertModal}
+        onClose={() => setShowRevertModal(false)}
+        onConfirm={handleRevertToSqlite}
+        isDeleting={saving}
+        title="¿Activar SQLite Local?"
+        itemName="Motor SQLite 3 Local"
+        description="El sistema volverá a utilizar la base de datos local SQLite para almacenar todas las operaciones del portal BIMUN."
+        confirmButtonText="Activar SQLite"
+      />
+
+      {/* Modal for Migrating Data */}
+      <ConfirmDeleteModal
+        isOpen={showMigrateModal}
+        onClose={() => setShowMigrateModal(false)}
+        onConfirm={handleMigrateData}
+        isDeleting={migrating}
+        title={`¿Sincronizar y Migrar a ${dbConfig.type === 'postgres' ? 'PostgreSQL' : 'MySQL'}?`}
+        itemName={`Servidor ${dbConfig.type === 'postgres' ? 'PostgreSQL' : 'MySQL'}`}
+        description={`Se transferirán y sincronizarán comisiones, países, inscripciones, noticias, delegaciones y galería hacia el servidor remoto mediante actualización segura.`}
+        confirmButtonText="Iniciar Migración"
+      />
     </div>
   );
 };

@@ -15,6 +15,7 @@ import { AboutCardItem } from './AboutCardItem.tsx';
 import { AboutEditModal } from './AboutEditModal.tsx';
 import { GalleryBatchUploadModal } from './GalleryBatchUploadModal.tsx';
 import { GalleryCategoryManagerModal } from './GalleryCategoryManagerModal.tsx';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
 import {
   BIMUNSettings, Committee, Country, Delegation, ScheduleItem,
   DocumentItem, GalleryItem, TeamMember, NewsItem, Registration,
@@ -74,6 +75,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [categoryManagerModalOpen, setCategoryManagerModalOpen] = useState(false);
   const [selectedGalleryCategoryFilter, setSelectedGalleryCategoryFilter] = useState<string>('all');
   const [selectedGalleryIds, setSelectedGalleryIds] = useState<string[]>([]);
+  const [isRestoringGallery, setIsRestoringGallery] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Partial<TeamMember> | null>(null);
   const [editingNews, setEditingNews] = useState<Partial<NewsItem> | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -89,6 +91,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isSavingAboutModal, setIsSavingAboutModal] = useState(false);
   const [isRestoringAbout, setIsRestoringAbout] = useState(false);
   const [confirmResetAboutModalOpen, setConfirmResetAboutModalOpen] = useState(false);
+
+  // Global delete confirmation state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemName?: string;
+    description?: string;
+    confirmButtonText?: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
 
   // Institutional content permissions: Admin, Superadmin, Coordinador, Academico
   const canEditAbout = user.role === 'admin' || user.role === 'superadmin' || user.role === 'coordinador' || user.role === 'academico';
@@ -260,18 +273,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleDeleteCommittee = async (id: string) => {
-    if (!window.confirm('¿Está seguro de eliminar esta comisión? Se borrarán también sus delegaciones asociadas.')) return;
-    try {
-      const res = await authFetch(`/api/admin/committees/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        showStatus('Comisión eliminada.');
-        loadAllAdminData();
-        onDataUpdated();
-      }
-    } catch (err: any) {
-      showStatus(err.message, 'error');
-    }
+  const handleDeleteCommittee = (id: string, name?: string) => {
+    const committeeName = name || committees.find((c) => c.id === id)?.name || id;
+    setDeleteConfirmation({
+      isOpen: true,
+      title: '¿Eliminar Comisión?',
+      itemName: committeeName,
+      description: 'Se eliminará esta comisión y se borrarán automáticamente todas las asignaciones y cupos de delegación asociados a ella.',
+      onConfirm: async () => {
+        setIsDeletingItem(true);
+        try {
+          const res = await authFetch(`/api/admin/committees/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setCommittees((prev) => prev.filter((c) => c.id !== id));
+            showStatus('Comisión eliminada con éxito.');
+            setDeleteConfirmation(null);
+            await loadAllAdminData();
+            onDataUpdated();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            showStatus(data.error || 'Error al eliminar la comisión', 'error');
+          }
+        } catch (err: any) {
+          showStatus(err.message, 'error');
+        } finally {
+          setIsDeletingItem(false);
+        }
+      },
+    });
   };
 
   // Country Actions
@@ -296,18 +325,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleDeleteCountry = async (id: string) => {
-    if (!window.confirm('¿Eliminar este país del catálogo?')) return;
-    try {
-      const res = await authFetch(`/api/admin/countries/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        showStatus('País eliminado.');
-        loadAllAdminData();
-        onDataUpdated();
-      }
-    } catch (err: any) {
-      showStatus(err.message, 'error');
-    }
+  const handleDeleteCountry = (id: string, name?: string) => {
+    const countryName = name || countries.find((c) => c.id === id)?.name || id;
+    setDeleteConfirmation({
+      isOpen: true,
+      title: '¿Eliminar País del Catálogo?',
+      itemName: countryName,
+      description: 'Esta acción removerá el país del catálogo de delegaciones. Si ya estaba asignado a algún cupo, podría afectar la visualización.',
+      onConfirm: async () => {
+        setIsDeletingItem(true);
+        try {
+          const res = await authFetch(`/api/admin/countries/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setCountries((prev) => prev.filter((c) => c.id !== id));
+            showStatus('País eliminado del catálogo.');
+            setDeleteConfirmation(null);
+            await loadAllAdminData();
+            onDataUpdated();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            showStatus(data.error || 'Error al eliminar el país', 'error');
+          }
+        } catch (err: any) {
+          showStatus(err.message, 'error');
+        } finally {
+          setIsDeletingItem(false);
+        }
+      },
+    });
   };
 
   // Delegation Actions
@@ -332,23 +377,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleDeleteDelegation = async (id: string) => {
-    if (!window.confirm('¿Eliminar este cupo de delegación?')) return;
-    try {
-      const res = await authFetch(`/api/admin/delegations/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        showStatus('Delegación eliminada.');
-        loadAllAdminData();
-        onDataUpdated();
-      }
-    } catch (err: any) {
-      showStatus(err.message, 'error');
-    }
+  const handleDeleteDelegation = (id: string, info?: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      title: '¿Eliminar Cupo de Delegación?',
+      itemName: info || `Cupo de Delegación #${id}`,
+      description: 'El cupo de delegación y su asignación actual serán removidos definitivamente.',
+      onConfirm: async () => {
+        setIsDeletingItem(true);
+        try {
+          const res = await authFetch(`/api/admin/delegations/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setDelegations((prev) => prev.filter((d) => d.id !== id));
+            showStatus('Delegación eliminada.');
+            setDeleteConfirmation(null);
+            await loadAllAdminData();
+            onDataUpdated();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            showStatus(data.error || 'Error al eliminar cupo de delegación', 'error');
+          }
+        } catch (err: any) {
+          showStatus(err.message, 'error');
+        } finally {
+          setIsDeletingItem(false);
+        }
+      },
+    });
   };
 
   const handleBatchGenerateSlots = async () => {
     if (!batchCommitteeId) {
-      alert('Por favor selecciona una comisión');
+      showStatus('Por favor selecciona una comisión', 'error');
       return;
     }
     try {
@@ -370,6 +430,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Registration Actions
+  const handleDeleteRegistration = (id: string, name?: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      title: '¿Eliminar Inscripción?',
+      itemName: name || `Inscripción #${id}`,
+      description: 'Esta postulación y todos sus datos asociados serán eliminados permanentemente del sistema.',
+      onConfirm: async () => {
+        setIsDeletingItem(true);
+        try {
+          const res = await authFetch(`/api/admin/registrations/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setRegistrations((prev) => prev.filter((r) => r.id !== id));
+            if (selectedReg?.id === id) setSelectedReg(null);
+            showStatus('Inscripción eliminada.');
+            setDeleteConfirmation(null);
+            await loadAllAdminData();
+            onDataUpdated();
+          } else {
+            showStatus('Error al eliminar inscripción', 'error');
+          }
+        } catch (err: any) {
+          showStatus(err.message, 'error');
+        } finally {
+          setIsDeletingItem(false);
+        }
+      },
+    });
+  };
+
   const handleUpdateRegStatus = async (
     id: string,
     status: 'approved' | 'assigned' | 'rejected' | 'pending',
@@ -488,6 +577,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       showStatus(err.message || 'Error de conexión', 'error');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Reset Default Demo Gallery
+  const handleResetDefaultGallery = async () => {
+    setIsRestoringGallery(true);
+    try {
+      const res = await authFetch('/api/admin/gallery/reset-defaults', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.gallery) {
+          setGallery(data.gallery);
+        }
+        if (data.categories) {
+          setGalleryCategories(data.categories);
+        }
+        setSelectedGalleryCategoryFilter('all');
+        setSelectedGalleryIds([]);
+        showStatus('Galería y categorías de demostración restauradas exitosamente.');
+        await loadAllAdminData();
+        onDataUpdated();
+      } else {
+        showStatus(data.error || 'Error al restaurar fotografías de demostración', 'error');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Error de conexión', 'error');
+    } finally {
+      setIsRestoringGallery(false);
     }
   };
 
@@ -1325,7 +1444,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteCommittee(com.id)}
+                          onClick={() => handleDeleteCommittee(com.id, `${com.abbreviation} - ${com.name}`)}
                           title="Eliminar"
                           className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300"
                         >
@@ -1435,7 +1554,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteDelegation(d.id)}
+                              onClick={() => handleDeleteDelegation(d.id, `${d.country_name} en ${d.committee_abbr || d.committee_name}`)}
                               className="p-1 rounded bg-slate-800 hover:bg-rose-900 text-rose-300"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1518,6 +1637,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-blue-400 font-semibold"
                             >
                               Gestionar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRegistration(r.id, `${r.full_name} (${r.school})`)}
+                              className="p-1 rounded bg-slate-800 hover:bg-rose-950 text-rose-400"
+                              title="Eliminar inscripción"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 inline" />
                             </button>
                           </td>
                         </tr>
@@ -1628,8 +1754,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           setIsRestoringAbout(true);
                           try {
                             const res = await authFetch('/api/admin/about/reset-defaults', { method: 'POST' });
-                            if (!res.ok) throw new Error('Error al restablecer');
-                            showStatus('Secciones oficiales cargadas');
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.error || 'Error al restablecer');
+                            if (data.sections) {
+                              setAboutSections(data.sections);
+                            }
+                            showStatus('Secciones oficiales cargadas exitosamente');
                             await loadAllAdminData();
                             onDataUpdated();
                           } catch (err: any) {
@@ -1696,20 +1826,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }
                     }}
                     onEditModal={() => setEditingAbout({ ...sec })}
-                    onDelete={async () => {
-                      if (!window.confirm(`¿Estás seguro de que deseas eliminar la sección "${sec.title}"?`)) return;
-                      try {
-                        const res = await authFetch(`/api/admin/about/${sec.id}`, { method: 'DELETE' });
-                        if (!res.ok) {
-                          const data = await res.json();
-                          throw new Error(data.error || 'Error al eliminar');
-                        }
-                        showStatus(`Sección "${sec.title}" eliminada.`);
-                        await loadAllAdminData();
-                        onDataUpdated();
-                      } catch (err: any) {
-                        showStatus(err.message, 'error');
-                      }
+                    onDelete={() => {
+                      setDeleteConfirmation({
+                        isOpen: true,
+                        title: '¿Eliminar Sección Institucional?',
+                        itemName: sec.title,
+                        description: `Se eliminará permanentemente la sección "${sec.title}" (${sec.section_key}) del portal de información.`,
+                        onConfirm: async () => {
+                          setIsDeletingItem(true);
+                          try {
+                            const res = await authFetch(`/api/admin/about/${sec.id}`, { method: 'DELETE' });
+                            if (!res.ok) {
+                              const data = await res.json().catch(() => ({}));
+                              throw new Error(data.error || 'Error al eliminar');
+                            }
+                            setAboutSections((prev) => prev.filter((item) => item.id !== sec.id));
+                            showStatus(`Sección "${sec.title}" eliminada.`);
+                            setDeleteConfirmation(null);
+                            await loadAllAdminData();
+                            onDataUpdated();
+                          } catch (err: any) {
+                            showStatus(err.message, 'error');
+                          } finally {
+                            setIsDeletingItem(false);
+                          }
+                        },
+                      });
                     }}
                   />
                 ))}
@@ -1759,13 +1901,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
-                        onClick={async () => {
-                          if (window.confirm('¿Eliminar evento del cronograma?')) {
-                            await authFetch(`/api/admin/schedule/${sch.id}`, { method: 'DELETE' });
-                            showStatus('Evento eliminado');
-                            loadAllAdminData();
-                            onDataUpdated();
-                          }
+                        onClick={() => {
+                          setDeleteConfirmation({
+                            isOpen: true,
+                            title: '¿Eliminar Evento del Cronograma?',
+                            itemName: `${sch.day_label}: ${sch.activity} (${sch.time_start} - ${sch.time_end})`,
+                            description: 'Este evento desaparecerá del cronograma oficial publicado para los asistentes.',
+                            onConfirm: async () => {
+                              setIsDeletingItem(true);
+                              try {
+                                const res = await authFetch(`/api/admin/schedule/${sch.id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                  setSchedule((prev) => prev.filter((s) => s.id !== sch.id));
+                                  showStatus('Evento eliminado');
+                                  setDeleteConfirmation(null);
+                                  await loadAllAdminData();
+                                  onDataUpdated();
+                                } else {
+                                  showStatus('Error al eliminar evento', 'error');
+                                }
+                              } catch (err: any) {
+                                showStatus(err.message, 'error');
+                              } finally {
+                                setIsDeletingItem(false);
+                              }
+                            },
+                          });
                         }}
                         className="p-1.5 rounded bg-rose-950/60 text-rose-300 hover:bg-rose-900"
                       >
@@ -1816,13 +1977,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
                       <span className="text-slate-500 font-mono">{doc.file_size}</span>
                       <button
-                        onClick={async () => {
-                          if (window.confirm('¿Eliminar documento?')) {
-                            await authFetch(`/api/admin/documents/${doc.id}`, { method: 'DELETE' });
-                            showStatus('Documento eliminado');
-                            loadAllAdminData();
-                            onDataUpdated();
-                          }
+                        onClick={() => {
+                          setDeleteConfirmation({
+                            isOpen: true,
+                            title: '¿Eliminar Documento o Guía?',
+                            itemName: `${doc.title} (${doc.category})`,
+                            description: 'Los delegados ya no podrán visualizar ni descargar este documento desde el portal.',
+                            onConfirm: async () => {
+                              setIsDeletingItem(true);
+                              try {
+                                const res = await authFetch(`/api/admin/documents/${doc.id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                  setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+                                  showStatus('Documento eliminado');
+                                  setDeleteConfirmation(null);
+                                  await loadAllAdminData();
+                                  onDataUpdated();
+                                } else {
+                                  showStatus('Error al eliminar documento', 'error');
+                                }
+                              } catch (err: any) {
+                                showStatus(err.message, 'error');
+                              } finally {
+                                setIsDeletingItem(false);
+                              }
+                            },
+                          });
                         }}
                         className="p-1 rounded text-rose-400 hover:bg-rose-950"
                       >
@@ -1868,6 +2048,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   >
                     <Images className="w-4 h-4" />
                     <span>Subir Varias Fotos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isRestoringGallery}
+                    onClick={() => {
+                      setDeleteConfirmation({
+                        isOpen: true,
+                        title: '¿Cargar Fotografías Oficiales de Demostración?',
+                        itemName: '8 fotos y categorías oficiales BIMUN',
+                        description: 'Esta acción añadirá las fotografías y temáticas oficiales de muestra a la galería.',
+                        confirmButtonText: 'Cargar Fotos Demo',
+                        onConfirm: async () => {
+                          setDeleteConfirmation(null);
+                          await handleResetDefaultGallery();
+                        },
+                      });
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 shadow-sm disabled:opacity-50"
+                    title="Restablecer o cargar fotografías oficiales de demostración"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 text-amber-400 ${isRestoringGallery ? 'animate-spin' : ''}`} />
+                    <span>{isRestoringGallery ? 'Cargando...' : 'Cargar Fotos Demo'}</span>
                   </button>
 
                   <button
@@ -1973,21 +2176,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={async () => {
-                            if (window.confirm(`¿Eliminar las ${selectedGalleryIds.length} fotografías seleccionadas?`)) {
-                              const res = await authFetch('/api/admin/gallery/batch-delete', {
-                                method: 'POST',
-                                body: JSON.stringify({ ids: selectedGalleryIds }),
-                              });
-                              if (res.ok) {
-                                showStatus(`${selectedGalleryIds.length} fotos eliminadas`);
-                                setSelectedGalleryIds([]);
-                                loadAllAdminData();
-                                onDataUpdated();
-                              } else {
-                                showStatus('Error al eliminar fotografías seleccionadas', 'error');
-                              }
-                            }
+                          onClick={() => {
+                            setDeleteConfirmation({
+                              isOpen: true,
+                              title: `¿Eliminar ${selectedGalleryIds.length} Fotografías?`,
+                              itemName: `${selectedGalleryIds.length} fotos seleccionadas`,
+                              description: 'Estas fotografías serán eliminadas definitivamente de la galería del portal BIMUN.',
+                              onConfirm: async () => {
+                                setIsDeletingItem(true);
+                                try {
+                                  const res = await authFetch('/api/admin/gallery/batch-delete', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ ids: selectedGalleryIds }),
+                                  });
+                                  if (res.ok) {
+                                    const deletedIds = [...selectedGalleryIds];
+                                    setGallery((prev) => prev.filter((item) => !deletedIds.includes(item.id)));
+                                    setSelectedGalleryIds([]);
+                                    showStatus(`${deletedIds.length} fotos eliminadas`);
+                                    setDeleteConfirmation(null);
+                                    await loadAllAdminData();
+                                    onDataUpdated();
+                                  } else {
+                                    showStatus('Error al eliminar fotografías seleccionadas', 'error');
+                                  }
+                                } catch (err: any) {
+                                  showStatus(err.message, 'error');
+                                } finally {
+                                  setIsDeletingItem(false);
+                                }
+                              },
+                            });
                           }}
                           className="px-3 py-1 rounded-lg bg-rose-600/20 border border-rose-500/30 text-rose-300 hover:bg-rose-600 hover:text-white font-bold flex items-center gap-1 transition-colors"
                         >
@@ -2000,20 +2219,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {gallery.length === 0 && (
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (window.confirm('¿Deseas restaurar las 8 fotografías predeterminadas de BIMUN?')) {
-                            const res = await authFetch('/api/admin/gallery/reset-defaults', { method: 'POST' });
-                            if (res.ok) {
-                              showStatus('Fotografías predeterminadas restauradas');
-                              loadAllAdminData();
-                              onDataUpdated();
-                            }
-                          }
-                        }}
-                        className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5"
+                        disabled={isRestoringGallery}
+                        onClick={handleResetDefaultGallery}
+                        className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 disabled:opacity-50"
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Restaurar Fotos de Ejemplo</span>
+                        <RotateCcw className={`w-3.5 h-3.5 text-amber-400 ${isRestoringGallery ? 'animate-spin' : ''}`} />
+                        <span>{isRestoringGallery ? 'Cargando...' : 'Restaurar Fotos de Ejemplo'}</span>
                       </button>
                     )}
                   </div>
@@ -2053,18 +2264,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={async () => {
-                            const res = await authFetch('/api/admin/gallery/reset-defaults', { method: 'POST' });
-                            if (res.ok) {
-                              showStatus('Fotografías predeterminadas restauradas');
-                              loadAllAdminData();
-                              onDataUpdated();
-                            }
-                          }}
-                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5"
+                          disabled={isRestoringGallery}
+                          onClick={handleResetDefaultGallery}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 disabled:opacity-50"
                         >
-                          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Cargar Fotografías de Demostración</span>
+                          <RotateCcw className={`w-3.5 h-3.5 text-amber-400 ${isRestoringGallery ? 'animate-spin' : ''}`} />
+                          <span>{isRestoringGallery ? 'Cargando...' : 'Cargar Fotografías de Demostración'}</span>
                         </button>
                       </div>
                     </div>
@@ -2116,13 +2321,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={async () => {
-                                if (window.confirm('¿Eliminar fotografía?')) {
-                                  await authFetch(`/api/admin/gallery/${g.id}`, { method: 'DELETE' });
-                                  showStatus('Foto eliminada');
-                                  loadAllAdminData();
-                                  onDataUpdated();
-                                }
+                              onClick={() => {
+                                setDeleteConfirmation({
+                                  isOpen: true,
+                                  title: '¿Eliminar Fotografía?',
+                                  itemName: g.title,
+                                  description: `Esta foto de la categoría "${g.category}" será eliminada de la galería pública.`,
+                                  onConfirm: async () => {
+                                    setIsDeletingItem(true);
+                                    try {
+                                      const res = await authFetch(`/api/admin/gallery/${g.id}`, { method: 'DELETE' });
+                                      if (res.ok) {
+                                        setGallery((prev) => prev.filter((item) => item.id !== g.id));
+                                        showStatus('Foto eliminada');
+                                        setDeleteConfirmation(null);
+                                        await loadAllAdminData();
+                                        onDataUpdated();
+                                      } else {
+                                        showStatus('Error al eliminar foto', 'error');
+                                      }
+                                    } catch (err: any) {
+                                      showStatus(err.message, 'error');
+                                    } finally {
+                                      setIsDeletingItem(false);
+                                    }
+                                  },
+                                });
                               }}
                               className="p-1.5 rounded-full bg-slate-900/90 text-rose-400 hover:bg-rose-900 transition-colors shadow"
                               title="Eliminar foto"
@@ -2208,13 +2432,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                     </div>
                     <button
-                      onClick={async () => {
-                        if (window.confirm('¿Eliminar miembro?')) {
-                          await authFetch(`/api/admin/team/${t.id}`, { method: 'DELETE' });
-                          showStatus('Miembro eliminado');
-                          loadAllAdminData();
-                          onDataUpdated();
-                        }
+                      onClick={() => {
+                        setDeleteConfirmation({
+                          isOpen: true,
+                          title: '¿Eliminar Miembro del Comité?',
+                          itemName: `${t.name} (${t.role} - ${t.category})`,
+                          description: 'Este integrante ya no aparecerá listado en el equipo organizador del portal.',
+                          onConfirm: async () => {
+                            setIsDeletingItem(true);
+                            try {
+                              const res = await authFetch(`/api/admin/team/${t.id}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                setTeam((prev) => prev.filter((item) => item.id !== t.id));
+                                showStatus('Miembro eliminado');
+                                setDeleteConfirmation(null);
+                                await loadAllAdminData();
+                                onDataUpdated();
+                              } else {
+                                showStatus('Error al eliminar miembro', 'error');
+                              }
+                            } catch (err: any) {
+                              showStatus(err.message, 'error');
+                            } finally {
+                              setIsDeletingItem(false);
+                            }
+                          },
+                        });
                       }}
                       className="p-1.5 rounded text-rose-400 hover:bg-rose-950"
                     >
@@ -2262,13 +2505,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <p className="text-xs text-slate-400 line-clamp-2">{item.excerpt}</p>
                     </div>
                     <button
-                      onClick={async () => {
-                        if (window.confirm('¿Eliminar noticia?')) {
-                          await authFetch(`/api/admin/news/${item.id}`, { method: 'DELETE' });
-                          showStatus('Noticia eliminada');
-                          loadAllAdminData();
-                          onDataUpdated();
-                        }
+                      onClick={() => {
+                        setDeleteConfirmation({
+                          isOpen: true,
+                          title: '¿Eliminar Noticia o Comunicado?',
+                          itemName: item.title,
+                          description: 'Esta noticia será removida de la sección de comunicados oficiales para participantes.',
+                          onConfirm: async () => {
+                            setIsDeletingItem(true);
+                            try {
+                              const res = await authFetch(`/api/admin/news/${item.id}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                setNews((prev) => prev.filter((n) => n.id !== item.id));
+                                showStatus('Noticia eliminada');
+                                setDeleteConfirmation(null);
+                                await loadAllAdminData();
+                                onDataUpdated();
+                              } else {
+                                showStatus('Error al eliminar noticia', 'error');
+                              }
+                            } catch (err: any) {
+                              showStatus(err.message, 'error');
+                            } finally {
+                              setIsDeletingItem(false);
+                            }
+                          },
+                        });
                       }}
                       className="p-1.5 rounded text-rose-400 hover:bg-rose-950"
                     >
@@ -2991,15 +3253,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
-              <button
-                onClick={() => {
-                  handleUpdateRegStatus(selectedReg.id, 'rejected');
-                  setSelectedReg(null);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-semibold"
-              >
-                Rechazar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleUpdateRegStatus(selectedReg.id, 'rejected');
+                    setSelectedReg(null);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-semibold"
+                >
+                  Rechazar
+                </button>
+                <button
+                  onClick={() => {
+                    handleDeleteRegistration(selectedReg.id, `${selectedReg.full_name} (${selectedReg.school})`);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-rose-900/30 hover:bg-rose-900 text-rose-400 text-xs font-semibold flex items-center gap-1 border border-rose-800/40"
+                  title="Eliminar inscripción definitivamente"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
@@ -3756,9 +4030,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   setIsRestoringAbout(true);
                   try {
                     const res = await authFetch('/api/admin/about/reset-defaults', { method: 'POST' });
+                    const data = await res.json();
                     if (!res.ok) {
-                      const data = await res.json();
                       throw new Error(data.error || 'Error al restablecer');
+                    }
+                    if (data.sections) {
+                      setAboutSections(data.sections);
                     }
                     showStatus('Textos institucionales oficiales restablecidos exitosamente');
                     setConfirmResetAboutModalOpen(false);
@@ -3787,6 +4064,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {deleteConfirmation && (
+        <ConfirmDeleteModal
+          isOpen={deleteConfirmation.isOpen}
+          onClose={() => setDeleteConfirmation(null)}
+          onConfirm={deleteConfirmation.onConfirm}
+          isDeleting={isDeletingItem}
+          title={deleteConfirmation.title}
+          itemName={deleteConfirmation.itemName}
+          description={deleteConfirmation.description}
+          confirmButtonText={deleteConfirmation.confirmButtonText}
+        />
       )}
     </div>
   );

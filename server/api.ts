@@ -2,7 +2,16 @@ import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { executeQueryAll, executeQueryOne, executeRunSql, initializeDatabaseManager, ensureDefaultAdmin } from './dbManager.ts';
-import { getDb, clearDemoData, reloadDemoData, resetDefaultAboutSections, resetDefaultGallery } from './db.ts';
+import {
+  getDb,
+  clearDemoData,
+  reloadDemoData,
+  resetDefaultAboutSections,
+  resetDefaultGallery,
+  DEFAULT_ABOUT_SECTIONS,
+  DEFAULT_GALLERY_CATEGORIES,
+  DEFAULT_GALLERY_ITEMS,
+} from './db.ts';
 import { getSmtpConfig, saveSmtpConfig, verifySmtpConnection, sendTestEmail } from './email.ts';
 import {
   SECURE_JWT_SECRET,
@@ -931,7 +940,18 @@ apiRouter.delete('/admin/about/:id', authMiddleware, canEditInstitutionalContent
 
 apiRouter.post('/admin/about/reset-defaults', authMiddleware, canEditInstitutionalContent, async (req, res) => {
   try {
-    resetDefaultAboutSections();
+    // Delete existing sections in active database
+    await executeRunSql('DELETE FROM about_sections;');
+
+    // Insert the 6 official BIMUN about sections
+    for (const abt of DEFAULT_ABOUT_SECTIONS) {
+      await executeRunSql(
+        `INSERT INTO about_sections (id, section_key, title, subtitle, content, icon, sort_order, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1);`,
+        [abt.id, abt.section_key, abt.title, abt.subtitle, abt.content, abt.icon, abt.sort_order]
+      );
+    }
+
     const sections = await executeQueryAll('SELECT * FROM about_sections ORDER BY sort_order ASC;');
     res.json({
       success: true,
@@ -939,6 +959,7 @@ apiRouter.post('/admin/about/reset-defaults', authMiddleware, canEditInstitution
       sections,
     });
   } catch (err: any) {
+    console.error('Error resetting about sections:', err);
     res.status(500).json({ error: 'Error al restablecer secciones institucionales', details: err.message });
   }
 });
@@ -1282,9 +1303,37 @@ apiRouter.post('/admin/gallery/reset-defaults', authMiddleware, async (req, res)
       return res.status(403).json({ error: 'No tienes permisos para restaurar la galería.' });
     }
 
-    const result = resetDefaultGallery();
-    res.json({ success: true, count: result.itemsCount, message: 'Galería restaurada con éxito.' });
+    // Delete existing gallery items in active database
+    await executeRunSql('DELETE FROM gallery;');
+
+    const now = new Date().toISOString();
+    for (const g of DEFAULT_GALLERY_ITEMS) {
+      await executeRunSql(
+        `INSERT INTO gallery (id, title, caption, image_url, category, edition, sort_order, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+        [g.id, g.title, g.caption, g.image_url, g.cat, g.edition, g.order, now]
+      );
+    }
+
+    // Ensure default gallery categories in settings
+    const categoriesJson = JSON.stringify(DEFAULT_GALLERY_CATEGORIES);
+    await executeRunSql(
+      `INSERT INTO settings (key, value, updated_at) VALUES ('gallery_categories', ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+      [categoriesJson, now]
+    );
+
+    const items = await executeQueryAll('SELECT * FROM gallery ORDER BY sort_order ASC, created_at DESC;');
+
+    res.json({
+      success: true,
+      count: items.length,
+      message: 'Galería de fotografías y categorías de demostración restauradas con éxito.',
+      gallery: items,
+      categories: DEFAULT_GALLERY_CATEGORIES,
+    });
   } catch (err: any) {
+    console.error('Error resetting gallery:', err);
     res.status(500).json({ error: 'Error al restaurar galería predeterminada', details: err.message });
   }
 });

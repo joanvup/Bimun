@@ -30,16 +30,14 @@ export const AboutEditModal: React.FC<AboutEditModalProps> = ({
   onSave,
   isSaving,
 }) => {
-  if (!isOpen || !section) return null;
-
-  const isEditing = Boolean(section.id);
-  const [title, setTitle] = useState(section.title || '');
-  const [subtitle, setSubtitle] = useState(section.subtitle || '');
-  const [sectionKey, setSectionKey] = useState(section.section_key || '');
-  const [content, setContent] = useState(section.content || '');
-  const [icon, setIcon] = useState(section.icon || 'Globe');
-  const [sortOrder, setSortOrder] = useState(section.sort_order || 1);
-  const [isActive, setIsActive] = useState(section.is_active !== undefined ? Boolean(section.is_active) : true);
+  const isEditing = Boolean(section?.id);
+  const [title, setTitle] = useState(section?.title || '');
+  const [subtitle, setSubtitle] = useState(section?.subtitle || '');
+  const [sectionKey, setSectionKey] = useState(section?.section_key || '');
+  const [content, setContent] = useState(section?.content || '');
+  const [icon, setIcon] = useState(section?.icon || 'Globe');
+  const [sortOrder, setSortOrder] = useState(section?.sort_order || 1);
+  const [isActive, setIsActive] = useState(section?.is_active !== undefined ? Boolean(section.is_active) : true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,6 +52,8 @@ export const AboutEditModal: React.FC<AboutEditModalProps> = ({
       setError(null);
     }
   }, [section]);
+
+  if (!isOpen || !section) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

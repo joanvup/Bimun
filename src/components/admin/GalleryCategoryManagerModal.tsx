@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tag, Plus, Edit2, Trash2, Check, X, AlertCircle, ArrowRight, RotateCcw, FolderPlus } from 'lucide-react';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
 
 interface GalleryCategoryManagerModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const GalleryCategoryManagerModal: React.FC<GalleryCategoryManagerModalPr
   const [editingName, setEditingName] = useState('');
   const [deletingCat, setDeletingCat] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState<string>('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,10 +146,6 @@ export const GalleryCategoryManagerModal: React.FC<GalleryCategoryManagerModalPr
   };
 
   const handleResetDefaults = async () => {
-    if (!window.confirm('¿Restablecer las categorías a las predeterminadas de BIMUN? (Debate, Protocolo, Negociación, Crisis, Premiación, Campus, Social, Inauguración, Clausura)')) {
-      return;
-    }
-
     const defaultCats = [
       'Debate',
       'Protocolo',
@@ -164,6 +162,7 @@ export const GalleryCategoryManagerModal: React.FC<GalleryCategoryManagerModalPr
     setError(null);
     try {
       await sendCategoriesRequest({ categories: defaultCats });
+      setShowResetConfirm(false);
       showStatus('Categorías restablecidas a las opciones predeterminadas.');
       onCategoriesUpdated();
     } catch (err: any) {
@@ -362,7 +361,7 @@ export const GalleryCategoryManagerModal: React.FC<GalleryCategoryManagerModalPr
         <div className="p-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between">
           <button
             type="button"
-            onClick={handleResetDefaults}
+            onClick={() => setShowResetConfirm(true)}
             disabled={isSaving}
             className="text-[11px] text-slate-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
           >
@@ -379,6 +378,17 @@ export const GalleryCategoryManagerModal: React.FC<GalleryCategoryManagerModalPr
           </button>
         </div>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={handleResetDefaults}
+        isDeleting={isSaving}
+        title="¿Restablecer Categorías Predeterminadas?"
+        itemName="Categorías oficiales BIMUN"
+        description="Se restablecerán las categorías oficiales por defecto (Debate, Protocolo, Negociación, Crisis, Premiación, Campus, Social, Inauguración, Clausura). Esta acción reorganizará la lista de categorías."
+        confirmButtonText="Restablecer Categorías"
+      />
     </div>
   );
 };

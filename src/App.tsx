@@ -16,6 +16,7 @@ import { Footer } from './components/Footer.tsx';
 import { AdminLoginModal } from './components/admin/AdminLoginModal.tsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
 import { ScrollToTopButton } from './components/ScrollToTopButton.tsx';
+import { ScrollReveal } from './components/common/ScrollReveal.tsx';
 import { PublicDataResponse, AdminUser } from './types.ts';
 
 export default function App() {
@@ -194,59 +195,81 @@ export default function App() {
       {/* Main Public Content Sections based on CMS settings toggles */}
       <main className="flex-1">
         {isSectionActive('nosotros', 'about') && (
-          <AboutSection aboutItems={about || []} />
+          <ScrollReveal>
+            <AboutSection aboutItems={about || []} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('comisiones', 'committees') && (
-          <CommitteesSection
-            committees={committees || []}
-            onSelectCommitteeForRegister={handleSelectCommitteeForRegister}
-          />
+          <ScrollReveal>
+            <CommitteesSection
+              committees={committees || []}
+              onSelectCommitteeForRegister={handleSelectCommitteeForRegister}
+            />
+          </ScrollReveal>
         )}
 
         {isSectionActive('delegaciones', 'delegations') && (
-          <DelegationsMatrix
-            delegations={delegations || []}
-            committees={committees || []}
-            onSelectDelegationForRegister={handleSelectDelegationForRegister}
-          />
+          <ScrollReveal>
+            <DelegationsMatrix
+              delegations={delegations || []}
+              committees={committees || []}
+              onSelectDelegationForRegister={handleSelectDelegationForRegister}
+            />
+          </ScrollReveal>
         )}
 
         {isSectionActive('temas', 'topics') && (
-          <TopicsSection committees={committees || []} />
+          <ScrollReveal>
+            <TopicsSection committees={committees || []} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('cronograma', 'schedule') && (
-          <ScheduleSection schedule={schedule || []} />
+          <ScrollReveal>
+            <ScheduleSection schedule={schedule || []} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('documentos', 'documents') && (
-          <DocumentsSection documents={documents || []} />
+          <ScrollReveal>
+            <DocumentsSection documents={documents || []} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('galeria', 'gallery') && (
-          <GallerySection gallery={gallery || []} configuredCategories={settings?.gallery_categories} />
+          <ScrollReveal>
+            <GallerySection gallery={gallery || []} configuredCategories={settings?.gallery_categories} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('comite', 'team') && (
-          <TeamSection team={team || []} />
+          <ScrollReveal>
+            <TeamSection team={team || []} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('noticias', 'news') && (
-          <NewsSection news={news || []} />
+          <ScrollReveal>
+            <NewsSection news={news || []} />
+          </ScrollReveal>
         )}
 
         {isSectionActive('inscripciones', 'registrations') && (
-          <RegistrationForm
-            committees={committees || []}
-            countries={countries || []}
-            initialCommittee={selectedRegCommittee}
-            initialCountry={selectedRegCountry}
-          />
+          <ScrollReveal id="inscripciones">
+            <RegistrationForm
+              committees={committees || []}
+              countries={countries || []}
+              initialCommittee={selectedRegCommittee}
+              initialCountry={selectedRegCountry}
+            />
+          </ScrollReveal>
         )}
 
         {isSectionActive('contacto', 'contact') && (
-          <ContactSection settings={settings} />
+          <ScrollReveal>
+            <ContactSection settings={settings} />
+          </ScrollReveal>
         )}
       </main>
 

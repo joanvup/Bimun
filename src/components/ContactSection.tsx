@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { MapPin, Mail, Phone, Instagram, Youtube, Send, CheckCircle2 } from 'lucide-react';
+import { MapPin, Mail, Phone, Instagram, Youtube, Send, CheckCircle2, AlertCircle } from 'lucide-react';
 import { BIMUNSettings } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
+import { HumanCaptcha } from './common/HumanCaptcha.tsx';
 
 interface ContactSectionProps {
   settings: BIMUNSettings;
@@ -13,9 +14,28 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
+  const [isCaptchaValid, setIsCaptchaValid] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setCaptchaError('');
+
+    if (honeypot) {
+      console.warn('Bot detected by honeypot.');
+      return;
+    }
+
+    if (!isCaptchaValid) {
+      setCaptchaError(
+        language === 'en'
+          ? 'Please complete the anti-spam verification before sending.'
+          : 'Por favor resuelve la verificación anti-spam antes de enviar el mensaje.'
+      );
+      return;
+    }
+
     setMsgSent(true);
   };
 
@@ -185,9 +205,40 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                   />
                 </div>
 
+                {/* Honeypot field (hidden for spam bots) */}
+                <div className="hidden" aria-hidden="true">
+                  <input
+                    type="text"
+                    name="company_title_check"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={honeypot}
+                    onChange={(e) => setHoneypot(e.target.value)}
+                  />
+                </div>
+
+                {/* Anti-spam CAPTCHA */}
+                <HumanCaptcha
+                  idPrefix="contact"
+                  isEn={language === 'en'}
+                  theme="dark"
+                  onVerify={(valid) => {
+                    setIsCaptchaValid(valid);
+                    if (valid) setCaptchaError('');
+                  }}
+                />
+
+                {captchaError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{captchaError}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30"
+                  disabled={!isCaptchaValid}
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30 disabled:shadow-none"
                 >
                   <Send className="w-4 h-4" />
                   <span>{t.contact.send_btn}</span>

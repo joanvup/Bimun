@@ -5,6 +5,7 @@ import { Committee, Country } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 import { ImageUploadField } from './common/ImageUploadField.tsx';
 import { PhoneInputWithMask } from './common/PhoneInputWithMask.tsx';
+import { HumanCaptcha } from './common/HumanCaptcha.tsx';
 
 interface RegistrationFormProps {
   committees: Committee[];
@@ -57,6 +58,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isCaptchaValid, setIsCaptchaValid] = useState<boolean>(false);
+  const [honeypot, setHoneypot] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
   const [registeredId, setRegisteredId] = useState<string>('');
@@ -275,6 +278,23 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
+    // Honeypot bot protection
+    if (honeypot) {
+      console.warn('Bot detected by honeypot.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Captcha validation
+    if (!isCaptchaValid) {
+      setErrorMessage(
+        isEn
+          ? 'Please complete the anti-spam human verification before submitting.'
+          : 'Por favor completa la verificación anti-spam antes de enviar la inscripción.'
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -330,7 +350,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   ];
 
   return (
-    <section id="inscripciones" className="py-24 bg-white border-b border-slate-200">
+    <section id="inscripciones-inner" className="py-24 bg-white border-b border-slate-200">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 space-y-3">
           <span className="text-xs font-bold uppercase tracking-widest text-blue-700 bg-blue-50 px-3.5 py-1 rounded-full border border-blue-200">
@@ -546,6 +566,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   >
                     <option value="">{t.registration.grade_placeholder}</option>
+                    <option value="4°">4° {isEn ? 'Grade' : 'Grado'}</option>
+                    <option value="5°">5° {isEn ? 'Grade' : 'Grado'}</option>
                     <option value="6°">6° {isEn ? 'Grade' : 'Grado'}</option>
                     <option value="7°">7° {isEn ? 'Grade' : 'Grado'}</option>
                     <option value="8°">8° {isEn ? 'Grade' : 'Grado'}</option>
@@ -810,6 +832,26 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               </div>
             </div>
 
+            {/* Honeypot field (hidden for bots) */}
+            <div className="hidden" aria-hidden="true">
+              <input
+                type="text"
+                name="website_verify"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </div>
+
+            {/* Anti-spam Human Verification (CAPTCHA) */}
+            <HumanCaptcha
+              idPrefix="registration"
+              isEn={isEn}
+              theme="light"
+              onVerify={(valid) => setIsCaptchaValid(valid)}
+            />
+
             {/* Submit button */}
             <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
               <span className="text-xs text-slate-500">
@@ -817,8 +859,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               </span>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
+                disabled={isSubmitting || !isCaptchaValid}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-blue-600/30 disabled:shadow-none flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
