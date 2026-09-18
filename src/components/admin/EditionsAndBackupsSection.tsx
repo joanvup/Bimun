@@ -122,7 +122,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
 
   // Pre-fill next edition defaults when opening wizard
   const handleOpenWizard = () => {
-    const curEdition = settings?.edition || 'BIMUN XXVI';
+    const curEdition = settings?.bimun_name || 'BIMUN XXVI';
     const curYear = new Date().getFullYear();
     // Try to guess next roman numeral or number
     let nextName = 'BIMUN XXVII';
@@ -149,7 +149,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const editionTag = (settings?.edition || 'BIMUN').replace(/\s+/g, '_');
+      const editionTag = (settings?.bimun_name || 'BIMUN').replace(/\s+/g, '_');
       a.download = `${editionTag}_backup_completo_${Date.now()}.json`;
       document.body.appendChild(a);
       a.click();
@@ -170,7 +170,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
       const res = await authFetch('/api/admin/editions/create-snapshot', {
         method: 'POST',
         body: JSON.stringify({
-          editionName: settings?.edition || 'BIMUN',
+          editionName: settings?.bimun_name || 'BIMUN',
           editionYear: new Date().getFullYear().toString(),
           title: snapshotTitle.trim(),
           description: snapshotDesc.trim(),
@@ -318,7 +318,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
           newDates: newDates.trim(),
           newSlogan: newSlogan.trim(),
           archiveCurrentEdition: archiveCurrent,
-          archiveTitle: `Memoria Histórica de ${settings?.edition || 'BIMUN Anterior'}`,
+          archiveTitle: `Memoria Histórica de ${settings?.bimun_name || 'BIMUN Anterior'}`,
           archiveDescription: `Respaldo automático generado antes de iniciar ${newEditionName.trim()} (${newEditionYear.trim()}).`,
           resetRegistrations,
           resetDelegationStatus: resetDelegations,
@@ -360,7 +360,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
             </div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-2.5">
               <span>Edición Activa:</span>
-              <span className="text-blue-400 font-extrabold">{settings?.edition || 'BIMUN XXVI'}</span>
+              <span className="text-blue-400 font-extrabold">{settings?.bimun_name || 'BIMUN XXVI'}</span>
             </h2>
             <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
               Guarda copias de seguridad de todo el contenido del sitio (incluyendo fotografías, videos catalogados, comisiones, países, inscripciones y configuraciones) o inicia un nuevo modelo MUN para el siguiente año preservando el archivo histórico.
@@ -462,7 +462,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
 
             <button
               onClick={() => {
-                setSnapshotTitle(`Respaldo ${settings?.edition || 'BIMUN'} - ${new Date().toLocaleDateString()}`);
+                setSnapshotTitle(`Respaldo ${settings?.bimun_name || 'BIMUN'} - ${new Date().toLocaleDateString()}`);
                 setSnapshotDesc(`Copia manual del estado actual.`);
                 setSnapshotModalOpen(true);
               }}
@@ -654,7 +654,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400">
-                Se guardará una copia idéntica del estado actual de <strong>{settings?.edition || 'BIMUN'}</strong> con todos sus registros, fotografías, delegaciones y configuraciones.
+                Se guardará una copia idéntica del estado actual de <strong>{settings?.bimun_name || 'BIMUN'}</strong> con todos sus registros, fotografías, delegaciones y configuraciones.
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
@@ -984,7 +984,7 @@ export const EditionsAndBackupsSection: React.FC<EditionsAndBackupsSectionProps>
                       className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700"
                     />
                     <span className="text-xs font-bold text-purple-200">
-                      Archivar automáticamente la edición actual ({settings?.edition || 'BIMUN Anterior'})
+                      Archivar automáticamente la edición actual ({settings?.bimun_name || 'BIMUN Anterior'})
                     </span>
                   </label>
                   <p className="text-[11px] text-slate-400 pl-6.5 leading-relaxed">

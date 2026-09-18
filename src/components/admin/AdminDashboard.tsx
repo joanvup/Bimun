@@ -576,7 +576,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const editionTag = (settings?.edition || 'BIMUN').replace(/\s+/g, '_');
+      const editionTag = (settings?.bimun_name || 'BIMUN').replace(/\s+/g, '_');
       a.download = `${editionTag}_backup_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       window.URL.revokeObjectURL(url);

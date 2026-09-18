@@ -66,7 +66,7 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
     setTimeout(onFinish, 300);
   };
 
-  const editionName = settings?.edition || 'BIMUN XXVII';
+  const editionName = settings?.bimun_name || 'BIMUN XXVII';
   const bimunTitle = settings?.bimun_name || 'BIMUN';
   const slogan = settings?.slogan || 'Forjando Líderes y Ciudadanos Globales';
 
