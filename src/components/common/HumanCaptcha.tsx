@@ -11,7 +11,7 @@ interface HumanCaptchaProps {
 export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
   onVerify,
   isEn = false,
-  theme = 'light',
+  theme,
   idPrefix = 'reg',
 }) => {
   const [num1, setNum1] = useState(0);
@@ -59,15 +59,15 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
     onVerify(correct);
   };
 
-  const isDark = theme === 'dark';
+  const forcedDark = theme === 'dark';
 
   return (
     <div
       id={`${idPrefix}-captcha-container`}
       className={`rounded-xl p-3.5 border transition-all ${
-        isDark
-          ? 'bg-slate-900/80 border-slate-700/90 text-slate-200'
-          : 'bg-slate-50/90 border-slate-200 text-slate-700'
+        forcedDark
+          ? 'bg-slate-900 border-slate-700 text-slate-200'
+          : 'bg-slate-50/90 dark:bg-slate-900/90 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200'
       }`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -77,9 +77,9 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
             className={`p-2 rounded-lg shrink-0 ${
               isCorrect
                 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                : isDark
+                : forcedDark
                 ? 'bg-slate-800 text-blue-400 border border-slate-700'
-                : 'bg-white text-blue-600 border border-slate-200 shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-xs'
             }`}
           >
             <ShieldCheck className="w-5 h-5" />
@@ -87,15 +87,15 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
 
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold uppercase tracking-wider">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
                 {isEn ? 'Anti-Spam Verification' : 'Verificación Anti-Spam'}
               </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold border border-blue-500/20">
                 CAPTCHA
               </span>
             </div>
 
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs mt-0.5 ${forcedDark ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
               {isEn ? 'Solve this to verify you are human:' : 'Resuelve la operación para verificar:'}
             </p>
           </div>
@@ -105,9 +105,9 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <div
             className={`px-3 py-1.5 rounded-lg font-mono font-bold tracking-wider text-sm select-none ${
-              isDark
+              forcedDark
                 ? 'bg-slate-950 border border-slate-700 text-amber-300'
-                : 'bg-white border border-slate-300 text-blue-900 shadow-xs'
+                : 'bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-blue-900 dark:text-amber-300 shadow-xs'
             }`}
             title={isEn ? 'Math challenge' : 'Operación matemática'}
           >
@@ -127,9 +127,9 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
                 ? isCorrect
                   ? 'border-emerald-500 ring-2 ring-emerald-500/30 text-emerald-500 bg-emerald-500/5'
                   : 'border-red-500 ring-2 ring-red-500/30 text-red-500 bg-red-500/5'
-                : isDark
+                : forcedDark
                 ? 'bg-slate-950 border-slate-700 text-white focus:border-blue-500'
-                : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
+                : 'bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-white focus:border-blue-500'
             }`}
           />
 
@@ -137,10 +137,10 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
             type="button"
             onClick={generateChallenge}
             title={isEn ? 'Change challenge' : 'Cambiar operación'}
-            className={`p-2 rounded-lg transition-colors border ${
-              isDark
+            className={`p-2 rounded-lg transition-colors border cursor-pointer ${
+              forcedDark
                 ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-300 shadow-xs'
+                : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 shadow-xs'
             }`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -150,7 +150,7 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
 
       {/* Validation status feedback */}
       {hasInteracted && isAnswered && !isCorrect && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-red-500 font-medium animate-fadeIn">
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-red-500 dark:text-rose-400 font-medium animate-fadeIn">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>
             {isEn
@@ -161,7 +161,7 @@ export const HumanCaptcha: React.FC<HumanCaptchaProps> = ({
       )}
 
       {isCorrect && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-emerald-500 font-medium">
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-emerald-500 dark:text-emerald-400 font-medium">
           <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
           <span>
             {isEn ? 'Verification successful.' : 'Verificación humana completada con éxito.'}

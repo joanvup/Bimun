@@ -16,6 +16,7 @@ import { Footer } from './components/Footer.tsx';
 import { AdminLoginModal } from './components/admin/AdminLoginModal.tsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
 import { ScrollToTopButton } from './components/ScrollToTopButton.tsx';
+import { FloatingThemeToggle } from './components/common/FloatingThemeToggle.tsx';
 import { ScrollReveal } from './components/common/ScrollReveal.tsx';
 import { IntroSplash } from './components/common/IntroSplash.tsx';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal.tsx';
@@ -200,7 +201,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-900 selection:bg-blue-600 selection:text-white font-sans">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-600 selection:text-white font-sans transition-colors duration-300">
       {/* Institutional Navigation Bar */}
       <Navbar
         settings={settings}
@@ -328,7 +329,8 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
       />
 
-      {/* Floating Scroll to Top Button */}
+      {/* Floating Theme Switcher & Scroll to Top Button */}
+      <FloatingThemeToggle />
       <ScrollToTopButton />
     </div>
   );

@@ -17,9 +17,12 @@ import {
   MapPin,
   Check,
   Search,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { BIMUNSettings } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
+import { useTheme } from '../context/ThemeContext.tsx';
 
 interface NavbarProps {
   settings: BIMUNSettings;
@@ -37,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSearch,
 }) => {
   const { language, setLanguage, t } = useLanguage();
+  const { isDark, toggleTheme } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -215,15 +219,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header
-      ref={navRef}
-      id="main-navbar"
-      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
-        isScrolled
-          ? 'bg-slate-950/95 backdrop-blur-md shadow-xl py-2.5 border-b border-slate-800/90'
-          : 'bg-gradient-to-b from-slate-950/95 via-slate-950/75 to-transparent py-4'
-      }`}
-    >
+    <div className="dark">
+      <header
+        ref={navRef}
+        id="main-navbar"
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
+          isScrolled
+            ? 'bg-white/95 dark:bg-slate-950/95 backdrop-blur-md shadow-md dark:shadow-xl py-2.5 border-b border-slate-200/90 dark:border-slate-800/90'
+            : 'bg-gradient-to-b from-white/95 via-white/80 to-transparent dark:from-slate-950/95 dark:via-slate-950/75 dark:to-transparent py-4'
+        }`}
+      >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
         {/* Logo & Brand */}
         <a
@@ -258,10 +263,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
           <div className="flex flex-col justify-center">
-            <span className="font-display tracking-wider text-xl sm:text-2xl font-bold text-white group-hover:text-blue-200 transition-colors leading-tight">
+            <span className="font-display tracking-wider text-xl sm:text-2xl font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-200 transition-colors leading-tight">
               {settings.bimun_name || 'BIMUN XXVII'}
             </span>
-            <span className="text-[11px] sm:text-xs text-slate-400 font-medium tracking-tight truncate max-w-[200px] sm:max-w-sm mt-0.5">
+            <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 font-medium tracking-tight truncate max-w-[200px] sm:max-w-sm mt-0.5">
               {settings.institution_name || 'Fundación Colegio Bilingüe de Valledupar'}
             </span>
           </div>
@@ -273,7 +278,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <a
             href="#inicio"
             onClick={(e) => handleNavClick(e, '#inicio')}
-            className="text-xs font-semibold uppercase tracking-wider text-slate-300 hover:text-white px-3.5 py-2 rounded-lg hover:bg-slate-800/70 transition-colors"
+            className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3.5 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors"
           >
             {t.nav.home}
           </a>
@@ -289,25 +294,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() =>
                   setActiveDropdown(activeDropdown === 'institutional' ? null : 'institutional')
                 }
-                className={`text-xs font-semibold uppercase tracking-wider px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${
+                className={`text-xs font-semibold uppercase tracking-wider px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
                   activeDropdown === 'institutional'
-                    ? 'text-white bg-slate-800'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    ? 'text-blue-700 dark:text-white bg-slate-100 dark:bg-slate-800'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
                 }`}
                 aria-expanded={activeDropdown === 'institutional'}
               >
                 <span>{t.nav.institutional}</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                    activeDropdown === 'institutional' ? 'rotate-180 text-blue-400' : 'text-slate-400'
+                    activeDropdown === 'institutional' ? 'rotate-180 text-blue-600 dark:text-blue-400' : 'text-slate-400'
                   }`}
                 />
               </button>
 
               {/* Dropdown Menu */}
               {activeDropdown === 'institutional' && (
-                <div className="absolute top-full left-0 mt-1.5 w-72 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 shadow-2xl p-2.5 space-y-1 z-50 animate-in fade-in-50 zoom-in-95">
-                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-400 border-b border-slate-800/80 mb-1">
+                <div className="absolute top-full left-0 mt-1.5 w-72 rounded-2xl bg-white dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 space-y-1 z-50 animate-in fade-in-50 zoom-in-95">
+                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400 border-b border-slate-100 dark:border-slate-800/80 mb-1">
                     {t.nav.institutional_desc}
                   </div>
                   {institutionalItems.map((item) => (
@@ -315,16 +320,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       key={item.href}
                       href={item.href}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-800/90 text-slate-200 hover:text-white transition-all group"
+                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-white transition-all group"
                     >
-                      <div className="p-2 rounded-lg bg-slate-800/80 group-hover:bg-blue-600/20 group-hover:text-blue-300 transition-colors shrink-0">
+                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 group-hover:bg-blue-50 dark:group-hover:bg-blue-600/20 text-blue-600 dark:text-blue-300 transition-colors shrink-0">
                         {item.icon}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
                           {item.label}
                         </span>
-                        <span className="text-[11px] text-slate-400 group-hover:text-slate-300 font-normal leading-tight mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 font-normal leading-tight mt-0.5">
                           {item.desc}
                         </span>
                       </div>
@@ -346,10 +351,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() =>
                   setActiveDropdown(activeDropdown === 'academic' ? null : 'academic')
                 }
-                className={`text-xs font-semibold uppercase tracking-wider px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${
+                className={`text-xs font-semibold uppercase tracking-wider px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
                   activeDropdown === 'academic'
-                    ? 'text-white bg-slate-800'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    ? 'text-blue-700 dark:text-white bg-slate-100 dark:bg-slate-800'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
                 }`}
                 aria-expanded={activeDropdown === 'academic'}
               >
@@ -363,8 +368,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* Dropdown Menu */}
               {activeDropdown === 'academic' && (
-                <div className="absolute top-full left-0 mt-1.5 w-76 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 shadow-2xl p-2.5 space-y-1 z-50 animate-in fade-in-50 zoom-in-95">
-                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-400 border-b border-slate-800/80 mb-1">
+                <div className="absolute top-full left-0 mt-1.5 w-76 rounded-2xl bg-white dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 space-y-1 z-50 animate-in fade-in-50 zoom-in-95">
+                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400 border-b border-slate-100 dark:border-slate-800/80 mb-1">
                     {t.nav.academic_desc}
                   </div>
                   {academicItems.map((item) => (
@@ -372,16 +377,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       key={item.href}
                       href={item.href}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-800/90 text-slate-200 hover:text-white transition-all group"
+                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-white transition-all group"
                     >
-                      <div className="p-2 rounded-lg bg-slate-800/80 group-hover:bg-blue-600/20 group-hover:text-blue-300 transition-colors shrink-0">
+                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 group-hover:bg-blue-50 dark:group-hover:bg-blue-600/20 text-blue-600 dark:text-blue-300 transition-colors shrink-0">
                         {item.icon}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
                           {item.label}
                         </span>
-                        <span className="text-[11px] text-slate-400 group-hover:text-slate-300 font-normal leading-tight mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 font-normal leading-tight mt-0.5">
                           {item.desc}
                         </span>
                       </div>
@@ -403,25 +408,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() =>
                   setActiveDropdown(activeDropdown === 'event' ? null : 'event')
                 }
-                className={`text-xs font-semibold uppercase tracking-wider px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${
+                className={`text-xs font-semibold uppercase tracking-wider px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
                   activeDropdown === 'event'
-                    ? 'text-white bg-slate-800'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    ? 'text-blue-700 dark:text-white bg-slate-100 dark:bg-slate-800'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
                 }`}
                 aria-expanded={activeDropdown === 'event'}
               >
                 <span>{t.nav.event}</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                    activeDropdown === 'event' ? 'rotate-180 text-blue-400' : 'text-slate-400'
+                    activeDropdown === 'event' ? 'rotate-180 text-blue-600 dark:text-blue-400' : 'text-slate-400'
                   }`}
                 />
               </button>
 
               {/* Dropdown Menu */}
               {activeDropdown === 'event' && (
-                <div className="absolute top-full left-0 mt-1.5 w-72 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-800 shadow-2xl p-2.5 space-y-1 z-50 animate-in fade-in-50 zoom-in-95">
-                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-400 border-b border-slate-800/80 mb-1">
+                <div className="absolute top-full left-0 mt-1.5 w-72 rounded-2xl bg-white dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 space-y-1 z-50 animate-in fade-in-50 zoom-in-95">
+                  <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400 border-b border-slate-100 dark:border-slate-800/80 mb-1">
                     {t.nav.event_desc}
                   </div>
                   {eventItems.map((item) => (
@@ -429,16 +434,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                       key={item.href}
                       href={item.href}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-800/90 text-slate-200 hover:text-white transition-all group"
+                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-white transition-all group"
                     >
-                      <div className="p-2 rounded-lg bg-slate-800/80 group-hover:bg-blue-600/20 group-hover:text-blue-300 transition-colors shrink-0">
+                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 group-hover:bg-blue-50 dark:group-hover:bg-blue-600/20 text-blue-600 dark:text-blue-300 transition-colors shrink-0">
                         {item.icon}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
                           {item.label}
                         </span>
-                        <span className="text-[11px] text-slate-400 group-hover:text-slate-300 font-normal leading-tight mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 font-normal leading-tight mt-0.5">
                           {item.desc}
                         </span>
                       </div>
@@ -456,14 +461,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenSearch && (
             <button
               onClick={onOpenSearch}
-              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 text-slate-400 hover:text-slate-200 transition-all shadow-inner text-xs group cursor-pointer"
+              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all shadow-sm text-xs group cursor-pointer"
               title={language === 'en' ? 'Search (Ctrl+K / ⌘K)' : 'Buscar comisiones, documentos, noticias... (Ctrl+K / ⌘K)'}
             >
-              <Search className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline text-slate-300 font-medium">
+              <Search className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+              <span className="hidden lg:inline text-slate-700 dark:text-slate-300 font-medium">
                 {language === 'en' ? 'Quick Search...' : 'Buscar...'}
               </span>
-              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                 ⌘K
               </kbd>
             </button>
@@ -473,22 +478,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenSearch && (
             <button
               onClick={onOpenSearch}
-              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 transition-colors"
+              className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 transition-colors cursor-pointer"
               title={language === 'en' ? 'Search' : 'Buscar'}
               aria-label="Buscar en la plataforma"
             >
-              <Search className="w-4 h-4 text-blue-400" />
+              <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </button>
           )}
 
           {/* Functional Language Switcher (Español / English) */}
-          <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-0.5 shadow-inner">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl p-0.5 shadow-sm">
             <button
               onClick={() => setLanguage('es')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 language === 'es'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
               title="Cambiar a Español"
             >
@@ -497,10 +502,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => setLanguage('en')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 language === 'en'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
               title="Switch to English"
             >
@@ -508,6 +513,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="tracking-wider font-mono">EN</span>
             </button>
           </div>
+
+          {/* Theme Toggle Button (Light / Dark) */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-amber-400/50 text-slate-700 dark:text-slate-300 hover:text-amber-500 dark:hover:text-amber-300 transition-all shadow-sm cursor-pointer"
+            title={
+              isDark
+                ? language === 'en'
+                  ? 'Switch to Light Mode'
+                  : 'Cambiar a Modo Claro'
+                : language === 'en'
+                  ? 'Switch to Dark Mode'
+                  : 'Cambiar a Modo Oscuro'
+            }
+            aria-label="Cambiar tema claro / oscuro"
+          >
+            {isDark ? (
+              <Sun className="w-4 h-4 text-amber-400 animate-in spin-in-90 duration-300" />
+            ) : (
+              <Moon className="w-4 h-4 text-indigo-600 animate-in spin-in-90 duration-300" />
+            )}
+          </button>
 
           {/* Registration Button */}
           {isSectionActive('inscripciones', 'registrations') && (
@@ -525,16 +552,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isAdminLoggedIn ? (
             <button
               onClick={onGoToCMS}
-              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition-colors"
+              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Ir al Panel Administrativo"
             >
-              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <Shield className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
               <span className="hidden md:inline">{t.nav.cms_panel}</span>
             </button>
           ) : (
             <button
               onClick={onOpenCMS}
-              className="text-xs font-semibold text-slate-400 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 flex items-center gap-1.5 transition-colors"
+              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Acceso Administrativo Secretaría"
             >
               <Lock className="w-3.5 h-3.5" />
@@ -545,7 +572,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800"
+            className="lg:hidden p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 cursor-pointer"
             aria-label="Abrir menú de navegación"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -555,36 +582,62 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer with Structured Groups */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-slate-950/98 border-b border-slate-800 px-4 pt-3 pb-6 space-y-3 mt-2 shadow-2xl backdrop-blur-2xl animate-in slide-in-from-top-2 max-h-[85vh] overflow-y-auto">
+        <div className="lg:hidden bg-white/98 dark:bg-slate-950/98 border-b border-slate-200 dark:border-slate-800 px-4 pt-3 pb-6 space-y-3 mt-2 shadow-2xl backdrop-blur-2xl animate-in slide-in-from-top-2 max-h-[85vh] overflow-y-auto">
           {/* Mobile Language Selector Bar */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-              <Globe className="w-4 h-4 text-blue-400" />
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <span>{language === 'es' ? 'Idioma / Language:' : 'Language / Idioma:'}</span>
             </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setLanguage('es')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg ${
+                className={`px-3 py-1 text-xs font-bold rounded-lg cursor-pointer ${
                   language === 'es'
                     ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white bg-slate-800'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-200 dark:bg-slate-800'
                 }`}
               >
                 🇪🇸 Español
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg ${
+                className={`px-3 py-1 text-xs font-bold rounded-lg cursor-pointer ${
                   language === 'en'
                     ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white bg-slate-800'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-200 dark:bg-slate-800'
                 }`}
               >
                 🇬🇧 English
               </button>
             </div>
           </div>
+
+          {/* Mobile Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              {isDark ? (
+                <Sun className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              )}
+              <span>
+                {isDark
+                  ? language === 'en'
+                    ? 'Dark Mode Active'
+                    : 'Modo Oscuro Activo'
+                  : language === 'en'
+                    ? 'Light Mode Active'
+                    : 'Modo Claro Activo'}
+              </span>
+            </div>
+            <span className="text-[11px] uppercase font-bold text-blue-600 dark:text-amber-400">
+              {language === 'en' ? 'Switch' : 'Cambiar'}
+            </span>
+          </button>
 
           {/* Mobile Search Input Trigger */}
           {onOpenSearch && (
@@ -593,13 +646,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setMobileMenuOpen(false);
                 onOpenSearch();
               }}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 text-slate-300 hover:text-white text-xs font-medium text-left transition-all"
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium text-left transition-all cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
-                <Search className="w-4 h-4 text-blue-400" />
+                <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>{language === 'en' ? 'Search committees, docs, news...' : 'Buscar comisiones, documentos, noticias...'}</span>
               </div>
-              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+              <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                 ⌘K
               </kbd>
             </button>
@@ -609,41 +662,41 @@ export const Navbar: React.FC<NavbarProps> = ({
           <a
             href="#inicio"
             onClick={(e) => handleNavClick(e, '#inicio')}
-            className="block text-xs font-bold uppercase tracking-wider text-slate-200 hover:text-white px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800/80"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80"
           >
             {t.nav.home}
           </a>
 
           {/* Group 1: Institucional Accordion */}
           {institutionalItems.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 overflow-hidden">
               <button
                 onClick={() => toggleMobileGroup('institutional')}
-                className="w-full flex items-center justify-between p-3 text-left text-xs font-bold uppercase tracking-wider text-slate-200 hover:text-white"
+                className="w-full flex items-center justify-between p-3 text-left text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white"
               >
                 <div className="flex items-center gap-2">
-                  <Landmark className="w-4 h-4 text-blue-400" />
+                  <Landmark className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>{t.nav.institutional}</span>
                 </div>
                 <ChevronDown
                   className={`w-4 h-4 transition-transform duration-200 text-slate-400 ${
-                    expandedMobileGroup === 'institutional' ? 'rotate-180 text-blue-400' : ''
+                    expandedMobileGroup === 'institutional' ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
                   }`}
                 />
               </button>
               {expandedMobileGroup === 'institutional' && (
-                <div className="p-2 pt-0 space-y-1 border-t border-slate-800/50 bg-slate-950/40">
+                <div className="p-2 pt-0 space-y-1 border-t border-slate-200/60 dark:border-slate-800/50 bg-white/60 dark:bg-slate-950/40">
                   {institutionalItems.map((item) => (
                     <a
                       key={item.href}
                       href={item.href}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 p-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800/60"
+                      className="flex items-center gap-2.5 p-2 rounded-lg text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
                     >
                       {item.icon}
                       <div className="flex flex-col">
                         <span className="font-semibold">{item.label}</span>
-                        <span className="text-[10px] text-slate-400">{item.desc}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</span>
                       </div>
                     </a>
                   ))}
@@ -654,34 +707,34 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Group 2: Académico Accordion */}
           {academicItems.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 overflow-hidden">
               <button
                 onClick={() => toggleMobileGroup('academic')}
-                className="w-full flex items-center justify-between p-3 text-left text-xs font-bold uppercase tracking-wider text-slate-200 hover:text-white"
+                className="w-full flex items-center justify-between p-3 text-left text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white"
               >
                 <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-blue-400" />
+                  <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>{t.nav.academic}</span>
                 </div>
                 <ChevronDown
                   className={`w-4 h-4 transition-transform duration-200 text-slate-400 ${
-                    expandedMobileGroup === 'academic' ? 'rotate-180 text-blue-400' : ''
+                    expandedMobileGroup === 'academic' ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
                   }`}
                 />
               </button>
               {expandedMobileGroup === 'academic' && (
-                <div className="p-2 pt-0 space-y-1 border-t border-slate-800/50 bg-slate-950/40">
+                <div className="p-2 pt-0 space-y-1 border-t border-slate-200/60 dark:border-slate-800/50 bg-white/60 dark:bg-slate-950/40">
                   {academicItems.map((item) => (
                     <a
                       key={item.href}
                       href={item.href}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 p-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800/60"
+                      className="flex items-center gap-2.5 p-2 rounded-lg text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
                     >
                       {item.icon}
                       <div className="flex flex-col">
                         <span className="font-semibold">{item.label}</span>
-                        <span className="text-[10px] text-slate-400">{item.desc}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</span>
                       </div>
                     </a>
                   ))}
@@ -692,34 +745,34 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Group 3: Evento Accordion */}
           {eventItems.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 overflow-hidden">
               <button
                 onClick={() => toggleMobileGroup('event')}
-                className="w-full flex items-center justify-between p-3 text-left text-xs font-bold uppercase tracking-wider text-slate-200 hover:text-white"
+                className="w-full flex items-center justify-between p-3 text-left text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white"
               >
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <Calendar className="w-4 h-4 text-amber-500 dark:text-amber-400" />
                   <span>{t.nav.event}</span>
                 </div>
                 <ChevronDown
                   className={`w-4 h-4 transition-transform duration-200 text-slate-400 ${
-                    expandedMobileGroup === 'event' ? 'rotate-180 text-blue-400' : ''
+                    expandedMobileGroup === 'event' ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
                   }`}
                 />
               </button>
               {expandedMobileGroup === 'event' && (
-                <div className="p-2 pt-0 space-y-1 border-t border-slate-800/50 bg-slate-950/40">
+                <div className="p-2 pt-0 space-y-1 border-t border-slate-200/60 dark:border-slate-800/50 bg-white/60 dark:bg-slate-950/40">
                   {eventItems.map((item) => (
                     <a
                       key={item.href}
                       href={item.href}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 p-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800/60"
+                      className="flex items-center gap-2.5 p-2 rounded-lg text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
                     >
                       {item.icon}
                       <div className="flex flex-col">
                         <span className="font-semibold">{item.label}</span>
-                        <span className="text-[10px] text-slate-400">{item.desc}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</span>
                       </div>
                     </a>
                   ))}
@@ -767,6 +820,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       )}
-    </header>
+      </header>
+    </div>
   );
 };

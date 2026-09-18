@@ -59,7 +59,7 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({ schedule }) =>
               <button
                 key={day}
                 onClick={() => setActiveDay(day)}
-                className={`text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all ${
+                className={`text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all cursor-pointer ${
                   currentDay === day
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700'

@@ -32,16 +32,16 @@ export const GallerySection: React.FC<GallerySectionProps> = ({ gallery, configu
   if (!gallery || gallery.length === 0) return null;
 
   return (
-    <section id="galeria" className="py-24 bg-slate-100/60 border-b border-slate-200">
+    <section id="galeria" className="py-24 bg-slate-100/60 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
-          <span className="text-xs font-bold uppercase tracking-widest text-blue-700 bg-blue-100 px-3.5 py-1 rounded-full border border-blue-200">
+          <span className="text-xs font-bold uppercase tracking-widest text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/60 px-3.5 py-1 rounded-full border border-blue-200 dark:border-blue-800/60">
             {t.gallery.badge}
           </span>
-          <h2 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+          <h2 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
             {t.gallery.title}
           </h2>
-          <p className="text-base text-slate-600 font-normal leading-relaxed">
+          <p className="text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed">
             {t.gallery.subtitle}
           </p>
 
@@ -51,10 +51,10 @@ export const GallerySection: React.FC<GallerySectionProps> = ({ gallery, configu
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all ${
+                className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer ${
                   activeCategory === cat
-                    ? 'bg-blue-900 text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                    ? 'bg-blue-900 dark:bg-blue-600 text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
                 }`}
               >
                 {cat === 'all' ? t.gallery.filter_all : cat}
@@ -69,7 +69,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({ gallery, configu
             <div
               key={photo.id}
               onClick={() => setSelectedPhoto(photo)}
-              className="group relative h-72 rounded-2xl overflow-hidden bg-slate-900 cursor-pointer shadow-sm border border-slate-200"
+              className="group relative h-72 rounded-2xl overflow-hidden bg-slate-900 cursor-pointer shadow-sm border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
             >
               <img
                 src={photo.image_url}
@@ -110,7 +110,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({ gallery, configu
           <div className="relative max-w-4xl w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
             <button
               onClick={() => setSelectedPhoto(null)}
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-950/70 text-white hover:bg-slate-800 transition-colors"
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-950/70 text-white hover:bg-slate-800 transition-colors cursor-pointer"
               aria-label="Cerrar"
             >
               <X className="w-5 h-5" />

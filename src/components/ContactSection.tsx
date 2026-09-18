@@ -117,7 +117,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                   href={settings.instagram_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors cursor-pointer"
                 >
                   <Instagram className="w-4 h-4 text-pink-400" />
                   <span>{language === 'en' ? 'Official Instagram' : 'Instagram Oficial'}</span>
@@ -128,7 +128,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                   href={settings.youtube_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors cursor-pointer"
                 >
                   <Youtube className="w-4 h-4 text-red-400" />
                   <span>{language === 'en' ? 'Live Broadcasts' : 'Transmisiones en Vivo'}</span>
@@ -162,7 +162,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                     setEmail('');
                     setMessage('');
                   }}
-                  className="text-xs font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 underline pt-2"
+                  className="text-xs font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 underline pt-2 cursor-pointer"
                 >
                   {language === 'en' ? 'Send another message' : 'Enviar otro mensaje'}
                 </button>
@@ -238,7 +238,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                 <button
                   type="submit"
                   disabled={!isCaptchaValid}
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30 disabled:shadow-none"
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-600/30 disabled:shadow-none cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
                   <span>{t.contact.send_btn}</span>

@@ -1,15 +1,77 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
+  :root {
+    --bg-canvas: #ffffff;
+    --bg-surface: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f5f9;
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text-heading: #0f172a;
+    --text-body: #334155;
+    --text-muted: #64748b;
+    --input-bg: #f8fafc;
+    --input-border: #cbd5e1;
+    --input-text: #0f172a;
+    --input-placeholder: #94a3b8;
+    --brand-primary: #1e3a8a;
+    --brand-accent: #d97706;
+  }
+
+  html.dark,
+  body.dark,
+  [data-theme="dark"] {
+    --bg-canvas: #020617;
+    --bg-surface: #0b0f19;
+    --bg-card: #0f172a;
+    --bg-card-hover: #1e293b;
+    --border-subtle: #1e293b;
+    --border-strong: #334155;
+    --text-heading: #f8fafc;
+    --text-body: #cbd5e1;
+    --text-muted: #94a3b8;
+    --input-bg: #070c18;
+    --input-border: #334155;
+    --input-text: #f8fafc;
+    --input-placeholder: #64748b;
+    --brand-primary: #3b82f6;
+    --brand-accent: #fbbf24;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg-canvas);
+    color: var(--text-body);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
+
+  html.dark body,
+  body.dark {
+    background-color: #020617;
+    color: #e2e8f0;
+  }
+
   .font-display {
     font-family: 'Cinzel', Georgia, 'Times New Roman', serif;
   }
   .font-serif-sub {
     font-family: 'Playfair Display', Georgia, serif;
   }
+}
+
+/* Base Dark Mode contrast enhancers for high legibility */
+html.dark select option {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b;
 }
 
 /* Custom smooth scroll and scrollbar */
@@ -31,11 +93,28 @@ div[id] {
   background: #f1f5f9;
 }
 
+html.dark ::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
 ::-webkit-scrollbar-thumb {
   background: #94a3b8;
   border-radius: 4px;
 }
 
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

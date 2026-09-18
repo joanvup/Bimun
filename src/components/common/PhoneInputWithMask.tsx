@@ -209,11 +209,11 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
     <div className="space-y-1">
       {label && (
         <div className="flex justify-between items-center">
-          <label htmlFor={id} className="text-xs font-semibold text-slate-700">
+          <label htmlFor={id} className="text-xs font-semibold text-slate-700 dark:text-slate-300">
             {label} {required && '*'}
           </label>
           {isFieldValid && (
-            <span className="text-[11px] text-emerald-600 flex items-center gap-1 font-medium">
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
               <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? 'Valid number' : 'Número válido'}
             </span>
           )}
@@ -221,12 +221,12 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
       )}
 
       <div
-        className={`relative flex items-center rounded-xl bg-white border transition-all shadow-sm ${
+        className={`relative flex items-center rounded-xl bg-white dark:bg-slate-950 border transition-all shadow-sm ${
           touched && error
-            ? 'border-rose-400 bg-rose-50/20 ring-1 ring-rose-400'
+            ? 'border-rose-400 dark:border-rose-500 bg-rose-50/20 dark:bg-rose-950/20 ring-1 ring-rose-400'
             : isFieldValid
-            ? 'border-emerald-300 ring-1 ring-emerald-200'
-            : 'border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20'
+            ? 'border-emerald-300 dark:border-emerald-600 ring-1 ring-emerald-200 dark:ring-emerald-800'
+            : 'border-slate-300 dark:border-slate-700 focus-within:border-blue-500 dark:focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20'
         }`}
       >
         {/* Country Dial Selector */}
@@ -234,17 +234,17 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
           <button
             type="button"
             onClick={() => setIsDropdownOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 pl-3 pr-2 py-2.5 h-full text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-l-xl border-r border-slate-200 transition-colors focus:outline-none"
+            className="flex items-center gap-1.5 pl-3 pr-2 py-2.5 h-full text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-l-xl border-r border-slate-200 dark:border-slate-800 transition-colors focus:outline-none cursor-pointer"
             aria-label={isEn ? 'Select Country Code' : 'Seleccionar Indicativo de País'}
           >
             <span className="text-base leading-none">{selectedCountry.flag}</span>
-            <span className="font-mono text-slate-800">{selectedCountry.dial}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <span className="font-mono text-slate-800 dark:text-slate-200">{selectedCountry.dial}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-64 max-h-60 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-1.5 animate-in fade-in-50 zoom-in-95">
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+            <div className="absolute top-full left-0 mt-1 w-64 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 z-50 py-1.5 animate-in fade-in-50 zoom-in-95">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800">
                 {isEn ? 'Select Country' : 'Selecciona el Indicativo'}
               </div>
               {COUNTRY_DIAL_OPTIONS.map((c) => (
@@ -252,15 +252,15 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
                   key={c.code}
                   type="button"
                   onClick={() => handleCountrySelect(c)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-blue-50 transition-colors ${
-                    selectedCountry.code === c.code ? 'bg-blue-50/80 font-bold text-blue-900' : 'text-slate-700'
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
+                    selectedCountry.code === c.code ? 'bg-blue-50/80 dark:bg-slate-800/80 font-bold text-blue-900 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base">{c.flag}</span>
                     <span className="truncate max-w-[130px]">{c.name}</span>
                   </div>
-                  <span className="font-mono font-bold text-slate-500">{c.dial}</span>
+                  <span className="font-mono font-bold text-slate-500 dark:text-slate-400">{c.dial}</span>
                 </button>
               ))}
             </div>
@@ -280,10 +280,10 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
             onChange={handleInputChange}
             onBlur={onBlur}
             placeholder={selectedCountry.samplePlaceholder}
-            className="w-full pl-3 pr-9 py-2.5 rounded-r-xl bg-transparent text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none font-mono"
+            className="w-full pl-3 pr-9 py-2.5 rounded-r-xl bg-transparent text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none font-mono"
           />
 
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none">
             {touched && error ? (
               <AlertCircle className="w-4 h-4 text-rose-500" />
             ) : isFieldValid ? (
@@ -297,12 +297,12 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
 
       {/* Helper & Error text */}
       {touched && error ? (
-        <p className="text-xs text-rose-600 font-medium flex items-center gap-1.5 pt-0.5 animate-in fade-in">
+        <p className="text-xs text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5 pt-0.5 animate-in fade-in">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           {error}
         </p>
       ) : (
-        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5 px-0.5">
+        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5 px-0.5">
           <span>
             {helperText ||
               (isEn
@@ -312,7 +312,7 @@ export const PhoneInputWithMask: React.FC<PhoneInputWithMaskProps> = ({
           {rawDigits.length > 0 && (
             <span
               className={`font-mono font-medium ${
-                isValidLength ? 'text-emerald-600' : 'text-slate-400'
+                isValidLength ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
               }`}
             >
               {rawDigits.length}/{selectedCountry.expectedDigits} {isEn ? 'digits' : 'dígitos'}
