@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, Lock, ShieldCheck } from 'lucide-react';
+import { Globe, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { BIMUNSettings } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 
@@ -8,6 +8,7 @@ interface FooterProps {
   onOpenCMS: () => void;
   isAdminLoggedIn: boolean;
   onGoToCMS: () => void;
+  onReplayIntro?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -15,6 +16,7 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenCMS,
   isAdminLoggedIn,
   onGoToCMS,
+  onReplayIntro,
 }) => {
   const { language, t } = useLanguage();
 
@@ -98,7 +100,7 @@ export const Footer: React.FC<FooterProps> = ({
             <p className="text-xs text-slate-400">
               {t.footer.admin_desc}
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap items-center gap-2">
               {isAdminLoggedIn ? (
                 <button
                   onClick={onGoToCMS}
@@ -114,6 +116,17 @@ export const Footer: React.FC<FooterProps> = ({
                 >
                   <Lock className="w-3.5 h-3.5" />
                   {language === 'en' ? 'Admin Access / CMS' : 'Acceso Administrativo / CMS'}
+                </button>
+              )}
+
+              {onReplayIntro && (
+                <button
+                  onClick={onReplayIntro}
+                  title="Reproducir animación de bienvenida"
+                  className="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-800 hover:border-cyan-500/40 text-xs font-medium flex items-center gap-1.5 transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{language === 'en' ? 'Play Intro' : 'Ver Intro'}</span>
                 </button>
               )}
             </div>

@@ -17,12 +17,21 @@ import { AdminLoginModal } from './components/admin/AdminLoginModal.tsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
 import { ScrollToTopButton } from './components/ScrollToTopButton.tsx';
 import { ScrollReveal } from './components/common/ScrollReveal.tsx';
+import { IntroSplash } from './components/common/IntroSplash.tsx';
+import { GlobalSearchModal } from './components/common/GlobalSearchModal.tsx';
 import { PublicDataResponse, AdminUser } from './types.ts';
 
 export default function App() {
   const [data, setData] = useState<PublicDataResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [showIntro, setShowIntro] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#cms') {
+      return false;
+    }
+    return true;
+  });
 
   // CMS state
   const [currentView, setCurrentView] = useState<'public' | 'cms'>('public');
@@ -78,6 +87,16 @@ export default function App() {
         setIsLoginModalOpen(true);
       }
     }
+
+    // Global keyboard shortcut for search (Cmd+K / Ctrl+K)
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
   const handleLoginSuccess = (token: string, user: AdminUser) => {
@@ -111,6 +130,17 @@ export default function App() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // If showing intro animation, display it with data synchronization
+  if (showIntro) {
+    return (
+      <IntroSplash
+        settings={data?.settings || null}
+        isDataReady={!loading && !!data}
+        onFinish={() => setShowIntro(false)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -183,6 +213,7 @@ export default function App() {
         }}
         isAdminLoggedIn={!!(adminToken && adminUser)}
         onGoToCMS={() => setCurrentView('cms')}
+        onOpenSearch={() => setIsSearchOpen(true)}
       />
 
       {/* Hero Header Section */}
@@ -279,6 +310,15 @@ export default function App() {
         onOpenCMS={() => setIsLoginModalOpen(true)}
         isAdminLoggedIn={!!(adminToken && adminUser)}
         onGoToCMS={() => setCurrentView('cms')}
+        onReplayIntro={() => setShowIntro(true)}
+      />
+
+      {/* Global Intelligent Search Spotlight Modal */}
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        data={data}
+        onSelectCommitteeForRegister={handleSelectCommitteeForRegister}
       />
 
       {/* CMS Login Modal */}

@@ -16,6 +16,7 @@ import {
   FileText,
   MapPin,
   Check,
+  Search,
 } from 'lucide-react';
 import { BIMUNSettings } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
@@ -25,6 +26,7 @@ interface NavbarProps {
   onOpenCMS: () => void;
   isAdminLoggedIn: boolean;
   onGoToCMS: () => void;
+  onOpenSearch?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCMS,
   isAdminLoggedIn,
   onGoToCMS,
+  onOpenSearch,
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -449,6 +452,35 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Action Controls: Language Selector + Registration Button + CMS */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Intelligent Quick Search Trigger Button (Desktop & Tablet) */}
+          {onOpenSearch && (
+            <button
+              onClick={onOpenSearch}
+              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 text-slate-400 hover:text-slate-200 transition-all shadow-inner text-xs group cursor-pointer"
+              title={language === 'en' ? 'Search (Ctrl+K / ⌘K)' : 'Buscar comisiones, documentos, noticias... (Ctrl+K / ⌘K)'}
+            >
+              <Search className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span className="hidden lg:inline text-slate-300 font-medium">
+                {language === 'en' ? 'Quick Search...' : 'Buscar...'}
+              </span>
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
+          {/* Mobile Quick Search Button */}
+          {onOpenSearch && (
+            <button
+              onClick={onOpenSearch}
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 transition-colors"
+              title={language === 'en' ? 'Search' : 'Buscar'}
+              aria-label="Buscar en la plataforma"
+            >
+              <Search className="w-4 h-4 text-blue-400" />
+            </button>
+          )}
+
           {/* Functional Language Switcher (Español / English) */}
           <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-0.5 shadow-inner">
             <button
@@ -553,6 +585,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Mobile Search Input Trigger */}
+          {onOpenSearch && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenSearch();
+              }}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 text-slate-300 hover:text-white text-xs font-medium text-left transition-all"
+            >
+              <div className="flex items-center gap-2.5">
+                <Search className="w-4 h-4 text-blue-400" />
+                <span>{language === 'en' ? 'Search committees, docs, news...' : 'Buscar comisiones, documentos, noticias...'}</span>
+              </div>
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+                ⌘K
+              </kbd>
+            </button>
+          )}
 
           {/* Direct Home Link */}
           <a
