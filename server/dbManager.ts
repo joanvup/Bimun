@@ -45,6 +45,27 @@ let lastErrorMessage: string | null = null;
 
 // Read saved config on startup
 export function loadSavedConfig(): DatabaseConnectionConfig {
+  // 1. First Priority: Environment Variables (Twelve-Factor App Pattern for Cloud Run / Production)
+  if (process.env.DATABASE_TYPE) {
+    const envType = process.env.DATABASE_TYPE.trim().toLowerCase();
+    if (envType === 'sqlite' || envType === 'postgres' || envType === 'mysql') {
+      const config: DatabaseConnectionConfig = {
+        type: envType as DatabaseType,
+        host: process.env.DATABASE_HOST,
+        port: process.env.DATABASE_PORT ? Number(process.env.DATABASE_PORT) : undefined,
+        database: process.env.DATABASE_NAME || process.env.DATABASE_DATABASE,
+        user: process.env.DATABASE_USER,
+        password: process.env.DATABASE_PASSWORD,
+        ssl: process.env.DATABASE_SSL === 'true',
+        connectionString: process.env.DATABASE_URL,
+      };
+      currentConfig = config;
+      console.log(`[DB-Manager] Configuración de base de datos cargada desde variables de entorno. Tipo activo: ${envType}`);
+      return currentConfig;
+    }
+  }
+
+  // 2. Second Priority: database-config.json file
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
