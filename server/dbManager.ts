@@ -248,6 +248,19 @@ function initSqliteSchemaAndSeed(db: SqlJsDatabase): void {
       role TEXT DEFAULT 'admin',
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS edition_archives (
+      id TEXT PRIMARY KEY,
+      edition_name TEXT NOT NULL,
+      edition_year TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      snapshot_json TEXT NOT NULL,
+      total_delegates INTEGER DEFAULT 0,
+      total_committees INTEGER DEFAULT 0,
+      total_photos INTEGER DEFAULT 0,
+      created_by TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Default admin user check
@@ -409,6 +422,19 @@ async function initPgSchema(pool: Pool): Promise<void> {
       role VARCHAR(100) DEFAULT 'admin',
       created_at VARCHAR(255) NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS edition_archives (
+      id VARCHAR(255) PRIMARY KEY,
+      edition_name VARCHAR(255) NOT NULL,
+      edition_year VARCHAR(50) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      snapshot_json TEXT NOT NULL,
+      total_delegates INTEGER DEFAULT 0,
+      total_committees INTEGER DEFAULT 0,
+      total_photos INTEGER DEFAULT 0,
+      created_by VARCHAR(255),
+      created_at VARCHAR(255) NOT NULL
+    );
   `);
 }
 
@@ -552,6 +578,19 @@ async function initMySqlSchema(pool: MySqlPool): Promise<void> {
       password_hash VARCHAR(255) NOT NULL,
       display_name VARCHAR(255) NOT NULL,
       role VARCHAR(100) DEFAULT 'admin',
+      created_at VARCHAR(191) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+    `CREATE TABLE IF NOT EXISTS edition_archives (
+      id VARCHAR(191) PRIMARY KEY,
+      edition_name VARCHAR(191) NOT NULL,
+      edition_year VARCHAR(50) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description LONGTEXT,
+      snapshot_json LONGTEXT NOT NULL,
+      total_delegates INT DEFAULT 0,
+      total_committees INT DEFAULT 0,
+      total_photos INT DEFAULT 0,
+      created_by VARCHAR(191),
       created_at VARCHAR(191) NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
   ];

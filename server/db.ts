@@ -275,6 +275,23 @@ function initSchemaAndSeed(db: Database): void {
     );
   `);
 
+  // 13. Edition Archives & Full System Backups
+  db.run(`
+    CREATE TABLE IF NOT EXISTS edition_archives (
+      id TEXT PRIMARY KEY,
+      edition_name TEXT NOT NULL,
+      edition_year TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      snapshot_json TEXT NOT NULL,
+      total_delegates INTEGER DEFAULT 0,
+      total_committees INTEGER DEFAULT 0,
+      total_photos INTEGER DEFAULT 0,
+      created_by TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
   // Check if initial admin user exists
   const userCheck = db.exec("SELECT COUNT(*) as count FROM users;");
   const userCount = userCheck.length > 0 && userCheck[0].values.length > 0 ? Number(userCheck[0].values[0][0]) : 0;

@@ -1466,34 +1466,187 @@ apiRouter.delete('/admin/news/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Full Relational Export for Backup or Migration to PostgreSQL / MySQL
-apiRouter.get('/admin/export-database', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+// -------------------------------------------------------------
+// COMPREHENSIVE BACKUP & ANNUAL EDITION CYCLE MANAGEMENT
+// -------------------------------------------------------------
+import {
+  generateFullBackup,
+  restoreFullBackup,
+  createEditionArchive,
+  listEditionArchives,
+  getEditionArchiveById,
+  deleteEditionArchive,
+  startNewModelYearEdition,
+} from './backupService.ts';
+
+// Full Export with Multimedia Catalog & All Structured Data
+apiRouter.get('/admin/backups/export', authMiddleware, adminOnlyMiddleware, async (req: any, res) => {
   try {
-    await getDb();
-    const backup = {
-      version: '1.0.0',
-      exported_at: new Date().toISOString(),
-      target_compatibilities: ['SQLite', 'PostgreSQL', 'MySQL'],
-      tables: {
-        settings: await executeQueryAll('SELECT * FROM settings;'),
-        about_sections: await executeQueryAll('SELECT * FROM about_sections;'),
-        committees: await executeQueryAll('SELECT * FROM committees;'),
-        countries: await executeQueryAll('SELECT * FROM countries;'),
-        delegations: await executeQueryAll('SELECT * FROM delegations;'),
-        schedule: await executeQueryAll('SELECT * FROM schedule;'),
-        documents: await executeQueryAll('SELECT * FROM documents;'),
-        gallery: await executeQueryAll('SELECT * FROM gallery;'),
-        organizing_team: await executeQueryAll('SELECT * FROM organizing_team;'),
-        news: await executeQueryAll('SELECT * FROM news;'),
-        registrations: await executeQueryAll('SELECT * FROM registrations;'),
-      }
-    };
+    const adminUser = req.user?.display_name || req.user?.username || 'Administrador';
+    const backup = await generateFullBackup(adminUser);
+    const editionTag = (backup.metadata.edition || 'BIMUN').replace(/\s+/g, '_');
+    const filename = `${editionTag}_backup_${backup.metadata.year}_${Date.now()}.json`;
 
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename="bimun_backup_' + Date.now() + '.json"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(backup);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al exportar respaldo completo', details: err.message });
+  }
+});
+
+// Legacy backwards-compatible export endpoint
+apiRouter.get('/admin/export-database', authMiddleware, adminOnlyMiddleware, async (req: any, res) => {
+  try {
+    const adminUser = req.user?.display_name || req.user?.username || 'Administrador';
+    const backup = await generateFullBackup(adminUser);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="bimun_backup_${Date.now()}.json"`);
     res.json(backup);
   } catch (err: any) {
     res.status(500).json({ error: 'Error al exportar base de datos', details: err.message });
+  }
+});
+
+// Restore from uploaded JSON Backup
+apiRouter.post('/admin/backups/restore', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ error: 'El cuerpo de la solicitud no contiene un archivo de respaldo válido.' });
+    }
+    const result = await restoreFullBackup(payload);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al restaurar respaldo', details: err.message });
+  }
+});
+
+// List all archived editions and snapshots
+apiRouter.get('/admin/editions/history', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const archives = await listEditionArchives();
+    res.json(archives);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al obtener historial de ediciones', details: err.message });
+  }
+});
+
+// Create a manual snapshot of the current state
+apiRouter.post('/admin/editions/create-snapshot', authMiddleware, adminOnlyMiddleware, async (req: any, res) => {
+  try {
+    const { editionName, editionYear, title, description } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Debes proporcionar un título para el respaldo.' });
+    }
+    const adminUser = req.user?.display_name || req.user?.username || 'Administrador';
+    const result = await createEditionArchive(
+      editionName || 'BIMUN Actual',
+      editionYear || new Date().getFullYear().toString(),
+      title,
+      description || '',
+      adminUser
+    );
+    res.json({ success: true, message: 'Copia de seguridad guardada exitosamente en el servidor.', archiveId: result.id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al crear copia de seguridad', details: err.message });
+  }
+});
+
+// Download a specific archive snapshot JSON
+apiRouter.get('/admin/editions/archive-download/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const archive = await getEditionArchiveById(req.params.id);
+    if (!archive) {
+      return res.status(404).json({ error: 'Archivo histórico no encontrado.' });
+    }
+    const snapshot = JSON.parse(archive.snapshot_json);
+    const filename = `${archive.edition_name.replace(/\s+/g, '_')}_${archive.edition_year}_backup.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(snapshot);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al descargar archivo de respaldo', details: err.message });
+  }
+});
+
+// Restore from an existing server-side archived snapshot
+apiRouter.post('/admin/editions/restore-archive/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const archive = await getEditionArchiveById(req.params.id);
+    if (!archive) {
+      return res.status(404).json({ error: 'Archivo histórico no encontrado.' });
+    }
+    const snapshot = JSON.parse(archive.snapshot_json);
+    const result = await restoreFullBackup(snapshot);
+    res.json({
+      success: true,
+      message: `Edición ${archive.edition_name} (${archive.edition_year}) restaurada con éxito.`,
+      restoredCounts: result.restoredCounts,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al restaurar edición archivada', details: err.message });
+  }
+});
+
+// Delete an archived snapshot from history
+apiRouter.delete('/admin/editions/archive/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    await deleteEditionArchive(req.params.id);
+    res.json({ success: true, message: 'Respaldo eliminado del historial.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al eliminar respaldo', details: err.message });
+  }
+});
+
+// Wizard to transition to a brand new annual MUN Model
+apiRouter.post('/admin/editions/start-new', authMiddleware, adminOnlyMiddleware, async (req: any, res) => {
+  try {
+    const {
+      newEditionName,
+      newEditionYear,
+      newSlogan,
+      newDates,
+      archiveCurrentEdition,
+      archiveTitle,
+      archiveDescription,
+      resetRegistrations,
+      resetDelegationStatus,
+      resetSchedule,
+      retainCommittees,
+      retainCountries,
+      retainGalleryHistory,
+      retainTeam,
+    } = req.body;
+
+    if (!newEditionName || !newEditionYear) {
+      return res.status(400).json({ error: 'El nombre y el año de la nueva edición son obligatorios.' });
+    }
+
+    const adminUser = req.user?.display_name || req.user?.username || 'Administrador';
+    const result = await startNewModelYearEdition(
+      {
+        newEditionName,
+        newEditionYear,
+        newSlogan,
+        newDates,
+        archiveCurrentEdition: archiveCurrentEdition ?? true,
+        archiveTitle,
+        archiveDescription,
+        resetRegistrations: resetRegistrations ?? true,
+        resetDelegationStatus: resetDelegationStatus ?? true,
+        resetSchedule: resetSchedule ?? true,
+        retainCommittees: retainCommittees ?? true,
+        retainCountries: retainCountries ?? true,
+        retainGalleryHistory: retainGalleryHistory ?? true,
+        retainTeam: retainTeam ?? false,
+      },
+      adminUser
+    );
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al iniciar nueva edición anual', details: err.message });
   }
 });
 

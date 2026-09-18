@@ -16,6 +16,7 @@ import { AboutEditModal } from './AboutEditModal.tsx';
 import { GalleryBatchUploadModal } from './GalleryBatchUploadModal.tsx';
 import { GalleryCategoryManagerModal } from './GalleryCategoryManagerModal.tsx';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
+import { EditionsAndBackupsSection } from './EditionsAndBackupsSection.tsx';
 import {
   BIMUNSettings, Committee, Country, Delegation, ScheduleItem,
   DocumentItem, GalleryItem, TeamMember, NewsItem, Registration,
@@ -38,7 +39,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDataUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'settings' | 'committees' | 'delegations' | 'registrations' | 'about' | 'schedule' | 'documents' | 'gallery' | 'team' | 'news' | 'users' | 'security'
+    'overview' | 'settings' | 'committees' | 'delegations' | 'registrations' | 'about' | 'schedule' | 'documents' | 'gallery' | 'team' | 'news' | 'users' | 'security' | 'editions'
   >('overview');
 
   const [stats, setStats] = useState<any>(null);
@@ -517,18 +518,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Backup Export
+  // Comprehensive Backup Export
   const handleExportBackup = async () => {
     try {
-      const res = await authFetch('/api/admin/export-database');
+      showStatus('Generando respaldo integral de base de datos...');
+      const res = await authFetch('/api/admin/backups/export');
+      if (!res.ok) throw new Error('Error al generar respaldo en el servidor');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `bimun_backup_${new Date().toISOString().split('T')[0]}.json`;
+      const editionTag = (settings?.edition || 'BIMUN').replace(/\s+/g, '_');
+      a.download = `${editionTag}_backup_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       window.URL.revokeObjectURL(url);
-      showStatus('Respaldo de base de datos descargado.');
+      showStatus('Respaldo integral de base de datos y multimedia descargado.', 'success');
     } catch (err: any) {
       showStatus(err.message, 'error');
     }
@@ -699,8 +703,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             { id: 'news', label: 'Noticias y Avisos', icon: Newspaper, badge: news.length },
             ...(user.role === 'admin' || user.role === 'superadmin'
               ? [
+                  { id: 'editions', label: 'Ciclo Anual & Respaldos', icon: Sparkles },
                   { id: 'users', label: 'Usuarios y Perfiles', icon: UserCheck },
-                  { id: 'security', label: 'Seguridad y Backup', icon: Database },
+                  { id: 'security', label: 'Seguridad & Servidores', icon: Database },
                 ]
               : []),
           ].map((item) => {
@@ -2743,6 +2748,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 token={token}
                 currentUser={user}
                 onStatusMessage={showStatus}
+              />
+            </div>
+          )}
+
+          {/* TAB 14: ANNUAL EDITIONS & BACKUPS (ADMIN ONLY) */}
+          {activeTab === 'editions' && (user.role === 'admin' || user.role === 'superadmin') && (
+            <div className="space-y-6 max-w-5xl">
+              <EditionsAndBackupsSection
+                token={token}
+                settings={settings}
+                onStatusMessage={showStatus}
+                onDataUpdated={() => {
+                  loadAllAdminData();
+                  onDataUpdated();
+                }}
               />
             </div>
           )}
