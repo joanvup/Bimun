@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Database, Server, CheckCircle2, AlertTriangle, RefreshCw, Send,
-  ArrowRightLeft, ShieldCheck, Download, HardDrive, Info
+  ArrowRightLeft, ShieldCheck, Download, HardDrive, Info, Layers, Zap
 } from 'lucide-react';
 import { DatabaseStatus, DatabaseConfig, DatabaseEngineType } from '../../types.ts';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
@@ -37,6 +37,25 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [showMigrateModal, setShowMigrateModal] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
+
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    try {
+      const res = await authFetch('/api/admin/clear-cache', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        onStatusMessage('La caché de datos públicos ha sido limpiada con éxito. El portal web público se ha sincronizado inmediatamente con los datos de producción.');
+        onDataUpdated();
+      } else {
+        onStatusMessage(data.error || 'Error al limpiar la caché de datos públicos', 'error');
+      }
+    } catch (err: any) {
+      onStatusMessage(err.message, 'error');
+    } finally {
+      setClearingCache(false);
+    }
+  };
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
     return fetch(url, {
@@ -261,6 +280,42 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Base de Datos</span>
             <span className="text-white font-mono truncate block">{dbStatus?.database || 'bimun_database.sqlite'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Cache Management Card */}
+      <div className="p-6 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              Caché de Rendimiento y Datos Públicos
+              <span className="text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                Optimización Activa
+              </span>
+            </h4>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              Para garantizar la máxima velocidad de carga de la web de BIMUN bajo alta concurrencia de delegados, el servidor mantiene una caché en memoria de alto rendimiento para el sitio público. El sistema purga la caché automáticamente ante cualquier edición en el CMS, pero puedes forzar una sincronización e invalidación manual inmediata aquí.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-blue-400" />
+            <span>Consultas cacheadas: Toda la información consolidada de la web.</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearCache}
+            disabled={clearingCache}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-amber-600/10 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${clearingCache ? 'animate-spin' : ''}`} />
+            <span>{clearingCache ? 'Limpiando...' : 'Limpiar Caché'}</span>
+          </button>
         </div>
       </div>
 

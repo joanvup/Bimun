@@ -25,6 +25,22 @@ import {
 
 export const apiRouter = Router();
 
+// Automatic cache invalidation on any administrative write operation
+apiRouter.use((req, res, next) => {
+  const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+  const isAdminPath = req.path.startsWith('/admin/');
+  const isExcluded =
+    req.path.startsWith('/admin/db-test') ||
+    req.path.startsWith('/admin/smtp/verify') ||
+    req.path.startsWith('/admin/smtp/send-test') ||
+    req.path.startsWith('/admin/suggest-seo');
+
+  if (isWriteMethod && isAdminPath && !isExcluded) {
+    invalidatePublicDataCache();
+  }
+  next();
+});
+
 // Helper to authenticate JWT
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -67,9 +83,22 @@ export function canEditInstitutionalContent(req: Request, res: Response, next: N
 // PUBLIC ENDPOINTS
 // -------------------------------------------------------------
 
-// Comprehensive public bundle for high performance
+// Server-side in-memory cache for ultra-fast response and low database load
+export let publicDataCache: any = null;
+
+export function invalidatePublicDataCache() {
+  publicDataCache = null;
+  console.log('[CACHE] Cache de datos públicos invalidada.');
+}
+
+// Comprehensive public bundle for high performance with server-side caching
 apiRouter.get('/public/data', async (req, res) => {
   try {
+    if (publicDataCache) {
+      console.log('[CACHE] Sirviendo datos públicos desde caché en memoria.');
+      return res.json(publicDataCache);
+    }
+
     await getDb();
 
     // Settings
@@ -160,7 +189,7 @@ apiRouter.get('/public/data', async (req, res) => {
     // Filter settings through strict whitelist to guarantee zero leakage of sensitive keys (e.g. SMTP passwords)
     const sanitizedSettings = filterPublicSettings(settings);
 
-    res.json({
+    const payload = {
       settings: sanitizedSettings,
       about,
       committees,
@@ -171,10 +200,28 @@ apiRouter.get('/public/data', async (req, res) => {
       gallery,
       team,
       news,
-    });
+    };
+
+    publicDataCache = payload;
+    console.log('[CACHE] Reconstruida la caché de datos públicos en memoria.');
+    res.json(payload);
   } catch (err: any) {
     console.error('Error fetching public data:', err);
     res.status(500).json({ error: 'Error al consultar datos públicos', details: err.message });
+  }
+});
+
+// Purge cache and force database reload
+apiRouter.post('/admin/clear-cache', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    invalidatePublicDataCache();
+    res.json({
+      success: true,
+      message: 'La caché de datos públicos ha sido limpiada con éxito. El portal público se sincronizará de inmediato con la base de datos.',
+      clearedAt: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Error al limpiar la caché', details: err.message });
   }
 });
 
