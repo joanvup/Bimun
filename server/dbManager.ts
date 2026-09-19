@@ -782,28 +782,28 @@ export async function initializeDatabaseManager(): Promise<void> {
 }
 
 /**
- * Guarantees that the default superadmin (admin / bimun2026) exists in the active database engine
+ * Guarantees that an initial superadmin exists ONLY if the users table is completely empty (clean database setup).
+ * If users already exist (e.g. administrator created their own personal accounts and deleted 'admin'),
+ * this function will respect their configuration and will NOT recreate 'admin'.
  */
 export async function ensureDefaultAdmin(): Promise<void> {
   try {
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync('bimun2026', salt);
-    const now = new Date().toISOString();
+    const userCheck = await executeQueryOne<any>('SELECT COUNT(*) as count FROM users;');
+    const userCount = userCheck ? Number(userCheck.count ?? userCheck['COUNT(*)'] ?? 0) : 0;
 
-    const existing = await executeQueryOne<any>(
-      'SELECT id, username, password_hash FROM users WHERE LOWER(TRIM(username)) = ?;',
-      ['admin']
-    );
+    if (userCount === 0) {
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync('bimun2026', salt);
+      const now = new Date().toISOString();
 
-    if (!existing) {
       await executeRunSql(
         'INSERT INTO users (id, username, password_hash, display_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?);',
         ['usr_admin_1', 'admin', hash, 'Secretaría General BIMUN', 'superadmin', now]
       );
-      console.log('✅ Default superadmin created/ensured: admin / bimun2026');
+      console.log('✅ Base de datos inicializada: Se creó superadmin inicial (admin / bimun2026).');
     }
   } catch (err: any) {
-    console.error('Error ensuring default admin:', err.message);
+    console.error('Error in ensureDefaultAdmin:', err.message);
   }
 }
 

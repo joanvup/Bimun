@@ -297,7 +297,6 @@ apiRouter.post('/public/register', registerRateLimiter, async (req, res) => {
 apiRouter.post('/auth/login', loginRateLimiter, async (req, res) => {
   try {
     await initializeDatabaseManager();
-    await ensureDefaultAdmin();
 
     const { username, password } = req.body;
     if (!username || !password) {
@@ -307,18 +306,10 @@ apiRouter.post('/auth/login', loginRateLimiter, async (req, res) => {
     const cleanUsername = String(username).trim().toLowerCase();
     const cleanPassword = String(password).trim();
 
-    let user = await executeQueryOne<any>(
+    const user = await executeQueryOne<any>(
       'SELECT * FROM users WHERE LOWER(TRIM(username)) = ?;',
       [cleanUsername]
     );
-
-    if (!user && cleanUsername === 'admin') {
-      await ensureDefaultAdmin();
-      user = await executeQueryOne<any>(
-        'SELECT * FROM users WHERE LOWER(TRIM(username)) = ?;',
-        [cleanUsername]
-      );
-    }
 
     if (!user) {
       recordFailedLogin(req);
@@ -330,14 +321,6 @@ apiRouter.post('/auth/login', loginRateLimiter, async (req, res) => {
       validPassword = bcrypt.compareSync(cleanPassword, user.password_hash);
     } catch {
       validPassword = false;
-    }
-
-    // Safety self-heal: if default admin credentials used
-    if (!validPassword && cleanUsername === 'admin' && cleanPassword === 'bimun2026') {
-      const salt = bcrypt.genSaltSync(10);
-      const newHash = bcrypt.hashSync('bimun2026', salt);
-      await executeRunSql('UPDATE users SET password_hash = ? WHERE id = ?;', [newHash, user.id]);
-      validPassword = true;
     }
 
     if (!validPassword) {
@@ -2062,9 +2045,22 @@ apiRouter.delete('/admin/users/:id', authMiddleware, adminOnlyMiddleware, async 
       return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta de usuario en sesión.' });
     }
 
-    const existing = await executeQueryOne('SELECT id FROM users WHERE id = ?;', [id]);
+    const existing = await executeQueryOne<any>('SELECT id, role, username FROM users WHERE id = ?;', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    // Safety guard: Prevent deleting the last remaining admin or superadmin
+    if (existing.role === 'admin' || existing.role === 'superadmin') {
+      const remainingAdmins = await executeQueryAll<any>(
+        "SELECT id FROM users WHERE role IN ('admin', 'superadmin') AND id != ?;",
+        [id]
+      );
+      if (!remainingAdmins || remainingAdmins.length === 0) {
+        return res.status(400).json({
+          error: 'Acción bloqueada por seguridad: Este es el único administrador activo del sistema. Debes crear o designar otro administrador antes de eliminarlo.'
+        });
+      }
     }
 
     await executeRunSql('DELETE FROM users WHERE id = ?;', [id]);
