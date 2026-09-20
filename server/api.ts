@@ -2206,7 +2206,7 @@ apiRouter.post('/admin/suggest-seo', authMiddleware, adminOnlyMiddleware, async 
 
   try {
     // Query active settings
-    const rawSettings = await executeQueryAll<{ key: string; value: string }>('SELECT key, value FROM settings;');
+    const rawSettings = await executeQueryAll<{ key: string; value: string }>('SELECT `key`, value FROM settings;');
     const settings: Record<string, string> = {};
     for (const r of rawSettings) {
       settings[r.key] = r.value;

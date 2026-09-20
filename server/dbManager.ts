@@ -924,23 +924,31 @@ export function getCurrentConfigSafe(): DatabaseConnectionConfig {
 
 function convertSqlForMySql(sql: string, params: any[]): { sql: string, params: any[] } {
   let outSql = sql;
-  let outParams = [...params];
+  const outParams = [...params];
   
-  outSql = outSql.replace(/WHERE key =/g, 'WHERE `key` =');
-  outSql = outSql.replace(/\(key, value, updated_at\)/g, '(`key`, value, updated_at)');
-  outSql = outSql.replace(/ON CONFLICT\(key\)/g, 'ON CONFLICT(`key`)');
+  // 1. Reserved keyword `key` escaping in MySQL (KEY is a reserved keyword in MySQL)
+  outSql = outSql.replace(/\bWHERE\s+key\s*=/gi, 'WHERE `key` =');
+  outSql = outSql.replace(/\bSELECT\s+key\s*,/gi, 'SELECT `key`,');
+  outSql = outSql.replace(/([(\s,])key([)\s,])/gi, '$1`key`$2');
   
-  if (outSql.includes('INSERT OR REPLACE INTO settings')) {
-     outSql = outSql.replace(/INSERT OR REPLACE INTO settings \(`key`, value, updated_at\) VALUES \(\?, \?, \?\);?/g,
-      'INSERT INTO settings (`key`, value, updated_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, updated_at = ?;');
-     outParams = [...params, params[1], params[2]];
+  // 2. Convert SQLite "INSERT OR REPLACE INTO settings" to standard MySQL ON DUPLICATE KEY UPDATE
+  if (/INSERT\s+OR\s+REPLACE\s+INTO\s+settings/i.test(outSql)) {
+    outSql = outSql.replace(/INSERT\s+OR\s+REPLACE\s+INTO\s+settings/gi, 'INSERT INTO settings');
+    if (!/ON\s+DUPLICATE\s+KEY\s+UPDATE/i.test(outSql)) {
+      outSql = outSql.replace(/;?\s*$/, ' ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = VALUES(`updated_at`);');
+    }
+    return { sql: outSql, params: outParams };
   }
   
-  if (outSql.includes('ON CONFLICT(`key`) DO UPDATE')) {
-     outSql = outSql.replace(/ON CONFLICT\(`key`\) DO UPDATE SET value = excluded\.value, updated_at = excluded\.updated_at;?/g, 
-     'ON DUPLICATE KEY UPDATE value = ?, updated_at = ?;');
-     outParams = [...params, params[1], params[2]];
+  // 3. Convert PostgreSQL / SQLite "ON CONFLICT(...) DO UPDATE..." to MySQL "ON DUPLICATE KEY UPDATE"
+  if (/ON\s+CONFLICT\s*\(?.*?\)?\s+DO\s+UPDATE/is.test(outSql)) {
+    outSql = outSql.replace(
+      /ON\s+CONFLICT\s*\(?.*?\)?\s+DO\s+UPDATE\s+SET\s+.*?(?:;|\s*$)/is,
+      'ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = VALUES(`updated_at`);'
+    );
+    return { sql: outSql, params: outParams };
   }
+
   return { sql: outSql, params: outParams };
 }
 
@@ -1017,8 +1025,11 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
       await pgPool.query(pgSql, pgParams);
       return;
     } catch (err: any) {
-      console.error('[PostgreSQL Write Error, falling back to SQLite]', err.message);
+      console.error('[PostgreSQL Write Error]', err.message);
       lastErrorMessage = `PostgreSQL: ${err.message}`;
+      if (currentConfig.type === 'postgres') {
+        throw new Error(`Error de persistencia en PostgreSQL: ${err.message}`);
+      }
       activeDatabaseType = 'sqlite';
     }
   }
@@ -1028,8 +1039,11 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
       await mysqlPool.query(mysqlSql, mysqlParams);
       return;
     } catch (err: any) {
-      console.error('[MySQL Write Error, falling back to SQLite]', err.message);
+      console.error('[MySQL Write Error]', err.message);
       lastErrorMessage = `MySQL: ${err.message}`;
+      if (currentConfig.type === 'mysql') {
+        throw new Error(`Error de persistencia en MySQL: ${err.message}`);
+      }
       activeDatabaseType = 'sqlite';
     }
   }
