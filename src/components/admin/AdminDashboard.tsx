@@ -120,10 +120,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             meta_keywords: data.meta_keywords || '',
           };
         });
+        onDataUpdated();
         if (data.is_fallback) {
-          showStatus('Sugerencias locales optimizadas con éxito. (API de Gemini inactiva, usando motor heurístico local)', 'success');
+          showStatus('Sugerencias de SEO generadas y guardadas en la base de datos (motor heurístico optimizado).', 'success');
         } else {
-          showStatus('Sugerencias de SEO generadas exitosamente con la IA de Gemini.');
+          showStatus('Sugerencias de SEO generadas y guardadas en la base de datos con la IA de Gemini.');
         }
       } else {
         showStatus(data.error || 'Error al generar sugerencias de SEO con Gemini', 'error');
@@ -298,17 +299,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setSavingSeo(true);
     try {
-      const payload = {
-        ...settings,
+      const seoPayload = {
+        meta_keywords: settings.meta_keywords || '',
+        meta_description: settings.meta_description || '',
+        meta_title: settings.meta_title || '',
         schema_json: typeof settings.schema_json === 'object' ? JSON.stringify(settings.schema_json, null, 2) : (settings.schema_json || ''),
+        og_image_url: settings.og_image_url || '',
+        twitter_handle: settings.twitter_handle || '',
       };
-      const res = await authFetch('/api/admin/settings', {
-        method: 'PUT',
-        body: JSON.stringify(payload),
+      const res = await authFetch('/api/admin/seo-settings', {
+        method: 'POST',
+        body: JSON.stringify(seoPayload),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showStatus('Configuración de SEO, Metadatos y Tarjetas Sociales guardada con éxito.');
+        showStatus('Configuración de SEO, Metadatos y Palabras Clave guardada explícitamente con éxito.');
         onDataUpdated();
       } else {
         showStatus(data.error || data.details || 'Error al guardar la configuración de SEO', 'error');

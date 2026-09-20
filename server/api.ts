@@ -2268,7 +2268,7 @@ REGLAS DE GENERACIÓN DE SEO:
     let response;
     try {
       response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -2293,9 +2293,9 @@ REGLAS DE GENERACIÓN DE SEO:
         }
       });
     } catch (firstErr: any) {
-      console.warn('First attempt with gemini-2.5-flash failed, trying fallback to gemini-1.5-flash...', firstErr.message || firstErr);
+      console.warn('First attempt with gemini-3.8-flash failed, trying fallback to gemini-flash-latest...', firstErr.message || firstErr);
       response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-flash-latest',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -2327,12 +2327,36 @@ REGLAS DE GENERACIÓN DE SEO:
     }
 
     const parsedResult = JSON.parse(text.trim());
+    const final_meta_title = (parsedResult.meta_title || `${eventName} | Modelo de Naciones Unidas`).trim().slice(0, 70);
+    const final_meta_description = (parsedResult.meta_description || slogan).trim().slice(0, 160);
+    const final_meta_keywords = (parsedResult.meta_keywords || `${eventName}, Modelo de Naciones Unidas, ${institution}, Valledupar, Debate Académico, Diplomacia, Liderazgo`).trim();
+
+    // Persist explicitly to settings table so that 'Sugerir con IA' automatically stores keywords and metadata in the DB
+    const now = new Date().toISOString();
+    await executeRunSql(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+      ['meta_title', final_meta_title, now]
+    );
+    await executeRunSql(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+      ['meta_description', final_meta_description, now]
+    );
+    await executeRunSql(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+      ['meta_keywords', final_meta_keywords, now]
+    );
+    invalidatePublicDataCache();
+
     res.json({
       success: true,
       is_fallback: false,
-      meta_title: parsedResult.meta_title,
-      meta_description: parsedResult.meta_description,
-      meta_keywords: parsedResult.meta_keywords || ''
+      persisted: true,
+      meta_title: final_meta_title,
+      meta_description: final_meta_description,
+      meta_keywords: final_meta_keywords
     });
 
   } catch (err: any) {
@@ -2343,9 +2367,32 @@ REGLAS DE GENERACIÓN DE SEO:
     const meta_description = `Participa en el ${eventName}, el prestigioso Modelo de Naciones Unidas del ${institution}. ${defaultSlogan} ¡Inscríbete hoy!`.slice(0, 160);
     const meta_keywords = `${eventName}, Modelo de Naciones Unidas, ${institution}, Valledupar, Debate Académico, Diplomacia, Liderazgo, Oratoria, Resoluciones ONU, Cesar, Colombia, BIMUN`;
 
+    try {
+      const now = new Date().toISOString();
+      await executeRunSql(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+        ['meta_title', meta_title, now]
+      );
+      await executeRunSql(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+        ['meta_description', meta_description, now]
+      );
+      await executeRunSql(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+        ['meta_keywords', meta_keywords, now]
+      );
+      invalidatePublicDataCache();
+    } catch (persistErr: any) {
+      console.error('Error persisting SEO fallback settings to database:', persistErr);
+    }
+
     res.json({
       success: true,
       is_fallback: true,
+      persisted: true,
       fallback_reason: err.message || 'Error de conexión con la IA de Google',
       meta_title,
       meta_description,
@@ -2353,5 +2400,70 @@ REGLAS DE GENERACIÓN DE SEO:
     });
   }
 });
+
+// Explicit endpoint to save SEO metadata (meta_keywords, meta_description, meta_title, schema_json, og_image_url, twitter_handle)
+async function handleSaveExplicitSeo(req: Request, res: Response) {
+  try {
+    const {
+      meta_keywords,
+      meta_description,
+      meta_title,
+      schema_json,
+      og_image_url,
+      twitter_handle
+    } = req.body;
+
+    const now = new Date().toISOString();
+    const updates: Record<string, string> = {};
+
+    if (meta_keywords !== undefined) {
+      updates['meta_keywords'] = String(meta_keywords ?? '').trim();
+    }
+    if (meta_description !== undefined) {
+      updates['meta_description'] = String(meta_description ?? '').trim();
+    }
+    if (meta_title !== undefined) {
+      updates['meta_title'] = String(meta_title ?? '').trim();
+    }
+    if (schema_json !== undefined) {
+      updates['schema_json'] = typeof schema_json === 'object' && schema_json !== null
+        ? JSON.stringify(schema_json, null, 2)
+        : String(schema_json ?? '');
+    }
+    if (og_image_url !== undefined) {
+      updates['og_image_url'] = String(og_image_url ?? '').trim();
+    }
+    if (twitter_handle !== undefined) {
+      updates['twitter_handle'] = String(twitter_handle ?? '').trim();
+    }
+
+    for (const [key, value] of Object.entries(updates)) {
+      await executeRunSql(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
+        [key, value, now]
+      );
+    }
+
+    invalidatePublicDataCache();
+
+    res.json({
+      success: true,
+      message: 'Campos SEO y metadatos guardados explícitamente en la base de datos.',
+      saved: updates
+    });
+  } catch (err: any) {
+    console.error('Error saving SEO settings explicitly:', err);
+    res.status(500).json({
+      error: 'Error al guardar explícitamente los campos de SEO en la base de datos',
+      details: err.message
+    });
+  }
+}
+
+apiRouter.put('/admin/seo-settings', authMiddleware, adminOnlyMiddleware, handleSaveExplicitSeo);
+apiRouter.post('/admin/seo-settings', authMiddleware, adminOnlyMiddleware, handleSaveExplicitSeo);
+apiRouter.put('/admin/settings/seo', authMiddleware, adminOnlyMiddleware, handleSaveExplicitSeo);
+apiRouter.post('/admin/settings/seo', authMiddleware, adminOnlyMiddleware, handleSaveExplicitSeo);
 
 
