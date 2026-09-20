@@ -4,7 +4,7 @@ import {
   Image, Newspaper, UserCheck, Key, Database, LogOut, Plus, Trash2,
   Edit2, Copy, Check, X, RefreshCw, Download, AlertCircle, Eye, EyeOff,
   Sparkles, RotateCcw, Mail, Lock, Images, Tag, SlidersHorizontal,
-  CheckSquare, Square, Clock, Loader2
+  CheckSquare, Square, Clock, Loader2, Save
 } from 'lucide-react';
 import { ImageUploadField } from '../common/ImageUploadField.tsx';
 import { VideoUploadField } from '../common/VideoUploadField.tsx';
@@ -117,6 +117,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ...prev,
             meta_title: data.meta_title,
             meta_description: data.meta_description,
+            meta_keywords: data.meta_keywords || '',
           };
         });
         if (data.is_fallback) {
@@ -258,6 +259,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     loadAllAdminData();
   }, []);
 
+  const [savingSeo, setSavingSeo] = useState(false);
+
   // Save Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,9 +273,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (res.ok) {
         showStatus('Configuración general y secciones guardadas correctamente.');
         onDataUpdated();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        showStatus(errorData.error || errorData.details || 'Error al guardar la configuración', 'error');
       }
     } catch (err: any) {
       showStatus(err.message, 'error');
+    }
+  };
+
+  // Dedicated Save SEO handler
+  const handleSaveSeo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settings) return;
+
+    if (settings.schema_json && typeof settings.schema_json === 'string' && settings.schema_json.trim()) {
+      try {
+        JSON.parse(settings.schema_json);
+      } catch (jsonErr: any) {
+        showStatus(`Error de sintaxis en Schema JSON-LD: ${jsonErr.message}. Corrige el formato antes de guardar.`, 'error');
+        return;
+      }
+    }
+
+    setSavingSeo(true);
+    try {
+      const payload = {
+        ...settings,
+        schema_json: typeof settings.schema_json === 'object' ? JSON.stringify(settings.schema_json, null, 2) : (settings.schema_json || ''),
+      };
+      const res = await authFetch('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showStatus('Configuración de SEO, Metadatos y Tarjetas Sociales guardada con éxito.');
+        onDataUpdated();
+      } else {
+        showStatus(data.error || data.details || 'Error al guardar la configuración de SEO', 'error');
+      }
+    } catch (err: any) {
+      showStatus(err.message || 'Error de conexión al guardar SEO', 'error');
+    } finally {
+      setSavingSeo(false);
     }
   };
 
@@ -1476,7 +1520,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              <form onSubmit={handleSaveSettings} className="space-y-6">
+              <form onSubmit={handleSaveSeo} className="space-y-6">
                 {/* 1. Meta Tags Básicos */}
                 <div className="bg-slate-950/60 rounded-2xl border border-slate-800 p-5 space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-800/60">
@@ -1678,7 +1722,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-1.5">
                     <textarea
                       rows={8}
-                      value={settings.schema_json || ''}
+                      value={typeof settings.schema_json === 'object' ? JSON.stringify(settings.schema_json, null, 2) : (settings.schema_json || '')}
                       onChange={(e) => setSettings({ ...settings, schema_json: e.target.value })}
                       placeholder={`{\n  "@context": "https://schema.org",\n  "@type": "WebApplication"\n}`}
                       className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-amber-300 focus:border-amber-500 focus:outline-none"
@@ -1686,6 +1730,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {(() => {
                       if (!settings.schema_json) return null;
                       try {
+                        if (typeof settings.schema_json === 'object') {
+                          return (
+                            <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" />
+                              Código JSON con formato válido para Schema.org.
+                            </p>
+                          );
+                        }
                         JSON.parse(settings.schema_json);
                         return (
                           <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5">
@@ -1708,9 +1760,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-600/30"
+                    id="btn-save-seo-settings"
+                    disabled={savingSeo}
+                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-600/30 flex items-center gap-2 cursor-pointer"
                   >
-                    Guardar Configuración SEO
+                    {savingSeo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Guardando SEO...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Guardar Configuración SEO</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

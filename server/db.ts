@@ -1,51 +1,30 @@
-import initSqlJs, { Database } from 'sql.js';
-import fs from 'fs';
-import path from 'path';
+import { Database } from 'sql.js';
 import bcrypt from 'bcryptjs';
-import { executeQueryAll, executeQueryOne, executeRunSql, getDatabaseStatus } from './dbManager.ts';
-
-const DB_PATH = path.join(process.cwd(), 'bimun_database.sqlite');
-
-let dbInstance: Database | null = null;
+import {
+  getSqliteDb,
+  getSqliteDbSync,
+  saveSqliteDisk,
+  executeQueryAll,
+  executeQueryOne,
+  executeRunSql,
+  getDatabaseStatus,
+} from './dbManager.ts';
 
 export async function getDb(): Promise<Database> {
-  if (dbInstance) return dbInstance;
-
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(DB_PATH)) {
-    try {
-      const fileBuffer = fs.readFileSync(DB_PATH);
-      dbInstance = new SQL.Database(fileBuffer);
-      console.log('Loaded existing SQLite database from', DB_PATH);
-    } catch (err) {
-      console.error('Error reading existing database, initializing new one:', err);
-      dbInstance = new SQL.Database();
-    }
-  } else {
-    console.log('Creating new SQLite database file...');
-    dbInstance = new SQL.Database();
-  }
-
-  initSchemaAndSeed(dbInstance);
-  saveDb();
-  return dbInstance;
+  return await getSqliteDb();
 }
 
 export function saveDb(): void {
-  if (!dbInstance) return;
-  try {
-    const data = dbInstance.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
-  } catch (err) {
-    console.error('Failed to save SQLite database to disk:', err);
-  }
+  saveSqliteDisk();
 }
 
 export function queryAll<T = any>(sql: string, params: any[] = []): T[] {
-  if (!dbInstance) throw new Error('Database not initialized');
-  const stmt = dbInstance.prepare(sql);
+  const db = getSqliteDbSync();
+  if (!db) {
+    console.warn('[db.ts queryAll] SQLite DB not initialized synchronously yet');
+    return [];
+  }
+  const stmt = db.prepare(sql);
   if (params && params.length > 0) {
     stmt.bind(params);
   }
@@ -64,8 +43,12 @@ export function queryOne<T = any>(sql: string, params: any[] = []): T | null {
 }
 
 export function runSql(sql: string, params: any[] = []): void {
-  if (!dbInstance) throw new Error('Database not initialized');
-  dbInstance.run(sql, params);
+  const db = getSqliteDbSync();
+  if (!db) {
+    console.warn('[db.ts runSql] SQLite DB not initialized synchronously yet');
+    return;
+  }
+  db.run(sql, params);
   saveDb();
 
   // Also asynchronously replicate write to target external engine if active
@@ -421,9 +404,10 @@ export function seedDefaultAboutSections(db: Database): void {
 }
 
 export function resetDefaultAboutSections(): void {
-  if (!dbInstance) throw new Error('Database not initialized');
-  dbInstance.run('DELETE FROM about_sections;');
-  seedDefaultAboutSections(dbInstance);
+  const db = getSqliteDbSync();
+  if (!db) throw new Error('Database not initialized');
+  db.run('DELETE FROM about_sections;');
+  seedDefaultAboutSections(db);
   saveDb();
 }
 
@@ -460,9 +444,10 @@ export function seedDefaultGallery(db: Database): void {
 }
 
 export function resetDefaultGallery(): { success: boolean; itemsCount: number } {
-  if (!dbInstance) throw new Error('Database not initialized');
-  dbInstance.run('DELETE FROM gallery;');
-  seedDefaultGallery(dbInstance);
+  const db = getSqliteDbSync();
+  if (!db) throw new Error('Database not initialized');
+  db.run('DELETE FROM gallery;');
+  seedDefaultGallery(db);
   saveDb();
   return { success: true, itemsCount: DEFAULT_GALLERY_ITEMS.length };
 }
@@ -950,7 +935,8 @@ function seedInitialData(db: Database): void {
 }
 
 export function clearDemoData(): { success: boolean; clearedCounts: Record<string, number> } {
-  if (!dbInstance) throw new Error('Database not initialized');
+  const db = getSqliteDbSync();
+  if (!db) throw new Error('Database not initialized');
   
   const tables = [
     'registrations',
@@ -982,13 +968,14 @@ export function clearDemoData(): { success: boolean; clearedCounts: Record<strin
 }
 
 export function reloadDemoData(): { success: boolean } {
-  if (!dbInstance) throw new Error('Database not initialized');
+  const db = getSqliteDbSync();
+  if (!db) throw new Error('Database not initialized');
 
   // First clear existing data to prevent duplicates
   clearDemoData();
 
-  // Re-run seed on dbInstance
-  seedInitialData(dbInstance);
+  // Re-run seed on db
+  seedInitialData(db);
   saveDb();
 
   return { success: true };

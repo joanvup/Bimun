@@ -93,7 +93,7 @@ export function saveConfigToFile(config: DatabaseConnectionConfig): void {
 // -------------------------------------------------------------
 // SQLite Helpers
 // -------------------------------------------------------------
-async function getSqliteDb(): Promise<SqlJsDatabase> {
+export async function getSqliteDb(): Promise<SqlJsDatabase> {
   if (sqliteDb) return sqliteDb;
 
   const SQL = await initSqlJs();
@@ -113,6 +113,10 @@ async function getSqliteDb(): Promise<SqlJsDatabase> {
 
   initSqliteSchemaAndSeed(sqliteDb);
   saveSqliteDisk();
+  return sqliteDb;
+}
+
+export function getSqliteDbSync(): SqlJsDatabase | null {
   return sqliteDb;
 }
 

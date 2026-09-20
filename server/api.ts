@@ -99,8 +99,6 @@ apiRouter.get('/public/data', async (req, res) => {
       return res.json(publicDataCache);
     }
 
-    await getDb();
-
     // Settings
     const rawSettings = await executeQueryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
     const settings: Record<string, any> = {};
@@ -228,7 +226,6 @@ apiRouter.post('/admin/clear-cache', authMiddleware, adminOnlyMiddleware, async 
 // Public registration submission (protected with rate limiter against spam)
 apiRouter.post('/public/register', registerRateLimiter, async (req, res) => {
   try {
-    await getDb();
     const {
       full_name,
       email,
@@ -441,11 +438,31 @@ apiRouter.get('/admin/stats', authMiddleware, async (req, res) => {
 apiRouter.get('/admin/settings', authMiddleware, async (req, res) => {
   const rows = await executeQueryAll<{ key: string; value: string; updated_at: string }>('SELECT * FROM settings;');
   const settingsObj: Record<string, any> = {};
+  const rawStringKeys = [
+    'schema_json',
+    'meta_title',
+    'meta_description',
+    'meta_keywords',
+    'og_image_url',
+    'twitter_handle',
+    'bimun_name',
+    'bimun_edition',
+    'slogan',
+    'hero_slogan',
+    'hero_tagline',
+    'institution_name',
+    'institution_short'
+  ];
+
   for (const r of rows) {
-    try {
-      settingsObj[r.key] = JSON.parse(r.value);
-    } catch {
+    if (rawStringKeys.includes(r.key)) {
       settingsObj[r.key] = r.value;
+    } else {
+      try {
+        settingsObj[r.key] = JSON.parse(r.value);
+      } catch {
+        settingsObj[r.key] = r.value;
+      }
     }
   }
   if (!settingsObj.start_date) {
@@ -474,13 +491,16 @@ apiRouter.put('/admin/settings', authMiddleware, async (req, res) => {
     const now = new Date().toISOString();
 
     for (const [key, val] of Object.entries(updates)) {
-      const valStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      if (val === undefined) continue;
+      const valStr = typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val ?? '');
       await executeRunSql(
         `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;`,
         [key, valStr, now]
       );
     }
+
+    invalidatePublicDataCache();
 
     res.json({ success: true, message: 'Configuración guardada exitosamente.' });
   } catch (err: any) {
@@ -2178,16 +2198,13 @@ apiRouter.post('/admin/smtp/send-test', authMiddleware, adminOnlyMiddleware, asy
   }
 });
 
-// AI-generated suggestions for meta_title and meta_description using Gemini with robust fallbacks (applet-seo + gemini-api)
+// AI-generated suggestions for meta_title, meta_description, and meta_keywords using Gemini with robust fallbacks
 apiRouter.post('/admin/suggest-seo', authMiddleware, adminOnlyMiddleware, async (req, res) => {
   let eventName = 'BIMUN';
   let slogan = '';
   let institution = 'Colegio Bilingüe de Valledupar';
 
   try {
-    // Initialize database connection
-    await getDb();
-
     // Query active settings
     const rawSettings = await executeQueryAll<{ key: string; value: string }>('SELECT key, value FROM settings;');
     const settings: Record<string, string> = {};
@@ -2237,7 +2254,7 @@ apiRouter.post('/admin/suggest-seo', authMiddleware, adminOnlyMiddleware, async 
     });
 
     const prompt = `Eres un estratega experto en marketing digital, redacción web y SEO para eventos académicos internacionales.
-Suministrado el siguiente contexto real sobre el Modelo de Naciones Unidas "${eventName}" (BIMUN) de la institución "${institution}", tu tarea es generar un Meta Title y una Meta Description optimizados para SEO para la página de inicio.
+Suministrado el siguiente contexto real sobre el Modelo de Naciones Unidas "${eventName}" (BIMUN) de la institución "${institution}", tu tarea es generar un Meta Title, una Meta Description y una lista de Meta Keywords optimizados para SEO para la página de inicio.
 
 CONTEXTO REAL DEL EVENTO:
 ${contentContext}
@@ -2245,7 +2262,8 @@ ${contentContext}
 REGLAS DE GENERACIÓN DE SEO:
 1. El "meta_title" debe tener entre 30 y 60 caracteres. Debe ser atractivo, incluir el nombre "${eventName}", el Colegio Bilingüe de Valledupar, y resumir el evento de forma persuasiva.
 2. La "meta_description" debe tener entre 120 y 160 caracteres. Debe capturar la esencia del modelo, usar palabras clave como debate, liderazgo, diplomacia, Valledupar, etc., e invitar a delegados a inscribirse o participar con un claro llamado a la acción.
-3. El resultado debe venir estrictamente en español, con excelente ortografía y redacción impecable. Evita clichés de inteligencia artificial.`;
+3. El "meta_keywords" debe ser una lista de entre 8 y 12 palabras o frases clave altamente relevantes separadas por comas (ejemplo: ${eventName}, Modelo de Naciones Unidas, ${institution}, Valledupar, Debate Académico, Diplomacia, Liderazgo Estudiantil, Cesar, Colombia, Oratoria, Resoluciones ONU).
+4. El resultado debe venir estrictamente en español, con excelente ortografía y redacción impecable. Evita clichés de inteligencia artificial.`;
 
     let response;
     try {
@@ -2264,9 +2282,13 @@ REGLAS DE GENERACIÓN DE SEO:
               meta_description: {
                 type: Type.STRING,
                 description: 'Sugerencia de descripción meta (Meta Description) en español para SEO de entre 120 y 160 caracteres.'
+              },
+              meta_keywords: {
+                type: Type.STRING,
+                description: 'Lista de 8 a 12 palabras o frases clave separadas por comas para meta_keywords.'
               }
             },
-            required: ['meta_title', 'meta_description']
+            required: ['meta_title', 'meta_description', 'meta_keywords']
           }
         }
       });
@@ -2287,9 +2309,13 @@ REGLAS DE GENERACIÓN DE SEO:
               meta_description: {
                 type: Type.STRING,
                 description: 'Sugerencia de descripción meta (Meta Description) en español para SEO de entre 120 y 160 caracteres.'
+              },
+              meta_keywords: {
+                type: Type.STRING,
+                description: 'Lista de 8 a 12 palabras o frases clave separadas por comas para meta_keywords.'
               }
             },
-            required: ['meta_title', 'meta_description']
+            required: ['meta_title', 'meta_description', 'meta_keywords']
           }
         }
       });
@@ -2305,7 +2331,8 @@ REGLAS DE GENERACIÓN DE SEO:
       success: true,
       is_fallback: false,
       meta_title: parsedResult.meta_title,
-      meta_description: parsedResult.meta_description
+      meta_description: parsedResult.meta_description,
+      meta_keywords: parsedResult.meta_keywords || ''
     });
 
   } catch (err: any) {
@@ -2314,13 +2341,15 @@ REGLAS DE GENERACIÓN DE SEO:
     const meta_title = `${eventName} | Modelo de Naciones Unidas - ${institution}`.slice(0, 60);
     const defaultSlogan = slogan || 'Debate, liderazgo y diplomacia internacional en Valledupar.';
     const meta_description = `Participa en el ${eventName}, el prestigioso Modelo de Naciones Unidas del ${institution}. ${defaultSlogan} ¡Inscríbete hoy!`.slice(0, 160);
+    const meta_keywords = `${eventName}, Modelo de Naciones Unidas, ${institution}, Valledupar, Debate Académico, Diplomacia, Liderazgo, Oratoria, Resoluciones ONU, Cesar, Colombia, BIMUN`;
 
     res.json({
       success: true,
       is_fallback: true,
       fallback_reason: err.message || 'Error de conexión con la IA de Google',
       meta_title,
-      meta_description
+      meta_description,
+      meta_keywords
     });
   }
 });
