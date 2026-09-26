@@ -190,7 +190,7 @@ function initSchemaAndSeed(db: Database): void {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       role TEXT NOT NULL,
-      category TEXT DEFAULT 'Secretaría',
+      category TEXT DEFAULT '',
       photo_url TEXT,
       bio TEXT,
       email TEXT,

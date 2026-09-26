@@ -2868,7 +2868,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     setEditingTeam({
                       name: '',
                       role: '',
-                      category: 'Secretaría',
+                      category: '',
                       photo_url: '',
                       bio: '',
                       email: '',
@@ -2890,41 +2890,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div>
                         <h4 className="font-display text-sm font-bold text-white">{t.name}</h4>
                         <span className="text-xs text-blue-400 font-medium">{t.role}</span>
-                        <p className="text-[11px] text-slate-400">{t.category}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setDeleteConfirmation({
-                          isOpen: true,
-                          title: '¿Eliminar Miembro del Comité?',
-                          itemName: `${t.name} (${t.role} - ${t.category})`,
-                          description: 'Este integrante ya no aparecerá listado en el equipo organizador del portal.',
-                          onConfirm: async () => {
-                            setIsDeletingItem(true);
-                            try {
-                              const res = await authFetch(`/api/admin/team/${t.id}`, { method: 'DELETE' });
-                              if (res.ok) {
-                                setTeam((prev) => prev.filter((item) => item.id !== t.id));
-                                showStatus('Miembro eliminado');
-                                setDeleteConfirmation(null);
-                                await loadAllAdminData();
-                                onDataUpdated();
-                              } else {
-                                showStatus('Error al eliminar miembro', 'error');
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditingTeam(t)}
+                        className="p-1.5 rounded text-blue-400 hover:bg-blue-950/50"
+                        title="Editar miembro"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDeleteConfirmation({
+                            isOpen: true,
+                            title: '¿Eliminar Miembro del Comité?',
+                            itemName: `${t.name} (${t.role})`,
+                            description: 'Este integrante ya no aparecerá listado en el equipo organizador del portal.',
+                            onConfirm: async () => {
+                              setIsDeletingItem(true);
+                              try {
+                                const res = await authFetch(`/api/admin/team/${t.id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                  setTeam((prev) => prev.filter((item) => item.id !== t.id));
+                                  showStatus('Miembro eliminado');
+                                  setDeleteConfirmation(null);
+                                  await loadAllAdminData();
+                                  onDataUpdated();
+                                } else {
+                                  showStatus('Error al eliminar miembro', 'error');
+                                }
+                              } catch (err: any) {
+                                showStatus(err.message, 'error');
+                              } finally {
+                                setIsDeletingItem(false);
                               }
-                            } catch (err: any) {
-                              showStatus(err.message, 'error');
-                            } finally {
-                              setIsDeletingItem(false);
-                            }
-                          },
-                        });
-                      }}
-                      className="p-1.5 rounded text-rose-400 hover:bg-rose-950"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                            },
+                          });
+                        }}
+                        className="p-1.5 rounded text-rose-400 hover:bg-rose-950"
+                        title="Eliminar miembro"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -4160,8 +4169,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                await authFetch('/api/admin/team', { method: 'POST', body: JSON.stringify(editingTeam) });
-                showStatus('Miembro agregado');
+                const isEdit = !!editingTeam.id;
+                const url = isEdit ? `/api/admin/team/${editingTeam.id}` : '/api/admin/team';
+                const method = isEdit ? 'PUT' : 'POST';
+                await authFetch(url, { method, body: JSON.stringify(editingTeam) });
+                showStatus(isEdit ? 'Miembro actualizado' : 'Miembro agregado');
                 setEditingTeam(null);
                 loadAllAdminData();
                 onDataUpdated();

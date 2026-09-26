@@ -1529,7 +1529,7 @@ apiRouter.post('/admin/team', authMiddleware, async (req, res) => {
     await executeRunSql(
       `INSERT INTO organizing_team (id, name, role, category, photo_url, bio, email, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, name, role, category || 'Secretaría', photo_url || '', bio || '', email || '', sort_order || 0]
+      [id, name, role, category || '', photo_url || '', bio || '', email || '', sort_order || 0]
     );
     res.status(201).json({ success: true, id });
   } catch (err: any) {
