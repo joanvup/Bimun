@@ -1,43 +1,112 @@
-# Plan de Implementación: Corrección de Vulnerabilidad de Seguridad en Hostinger (`esbuild`)
+# Actualización Institucional: Copresidencia, Discursos de Bienvenida y Guías de Estudio en Comisiones
 
-## 1. Diagnóstico de la Vulnerabilidad
-En el escaneo de seguridad de Hostinger para el dominio `bimun.colegiobilingue.edu.co`, se detectó la siguiente alerta de severidad alta:
-- **Paquete afectado:** `esbuild` (`@0.25.12` / `^0.25.0`) en `devDependencies`
-- **Identificador:** `GHSA-gv7w-rqvm-qjhr` (Vulnerabilidad relacionada con el binario y servidor local/protocolos de descarga)
-- **Solución indicada por Hostinger:** Actualizar a `esbuild@^0.28.1` (o versión estable más reciente `^0.28.2`).
+Implementación integral para renombrar "Vicepresidente" a "Copresidente" en todo el portal BIMUN, dotar a cada comisión de discursos individuales de bienvenida para el Presidente y Copresidente con diseño editorial, e incorporar la gestión y descarga de la Guía de Estudio en PDF tanto en las tarjetas del catálogo como en el modal de detalle.
 
 ---
 
-## 2. Cambios Propuestos y Estrategia Técnica
+## Decisiones Críticas y Preferencias Confirmadas
 
-### A. Actualización de la Dependencia
-- Actualizar `esbuild` en `package.json` de `"^0.25.0"` a `"^0.28.2"` (cumpliendo y superando el requerimiento de `>= 0.28.1`).
-- Ejecutar la instalación limpia de dependencias para actualizar el árbol en `node_modules` y `package-lock.json`.
+> [!IMPORTANT]
+> Con base en la sesión interactiva de clarificación previa, se han adoptado las siguientes directrices aprobadas:
 
-### B. Verificación de Compatibilidad del Script de Compilación
-El proyecto utiliza `esbuild` en el script de producción:
-```json
-"build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs"
+- **Discursos de Bienvenida Separados**: Se habilitan áreas de texto dedicadas e independientes tanto para el **Presidente** como para el **Copresidente** (`president_welcome` y `copresident_welcome`), permitiendo que cada miembro de la mesa directiva exprese su saludo y expectativas pedagógicas.
+- **Carga Dual de la Guía de Estudio en PDF**: En el panel administrativo se implementa una interfaz versátil que permite **subir directamente el archivo PDF** (con validación de tamaño y almacenamiento seguro) o **ingresar una URL externa** (Google Drive, OneDrive o repositorio institucional).
+- **Visibilidad Integral de Descarga**: El botón de descarga y consulta de la Guía de Estudio estará presente tanto de forma ágil en la **tarjeta exterior de cada comisión** como en una sección destacada dentro del **modal de detalle extendido**.
+
+---
+
+## 1. Visión General del Producto y Objetivos
+
+1. **Estandarización Terminológica ("Copresidente")**:
+   - Reemplazar en la interfaz pública y administrativa cualquier mención de "Vicepresidente" por "Copresidente" (y "Co-President" en inglés), reflejando la estructura diplomática moderna del modelo de Naciones Unidas BIMUN.
+2. **Discurso de Bienvenida de la Mesa Directiva**:
+   - Brindar a los delegados e instituciones un acercamiento directo a los líderes de cada comité a través de cartas o discursos de bienvenida en formato editorial, con tipografía refinada, comillas estilizadas y lectura cómoda.
+3. **Acceso Inmediato a las Guías de Estudio (Study Guides)**:
+   - Proveer a los delegados inscritos y prospectos el acceso directo al documento central de preparación académica (temas, reglas y dinámicas de debate) sin fricciones.
+
+---
+
+## 2. Experiencia de Usuario y Diseño Visual (UX & Design)
+
+Siguiendo la constitución de diseño institucional (*Museum, Editorial & Institutional Design*):
+
+### A. Vista Pública: Tarjeta de Comisión en Cuadrícula (`CommitteesSection.tsx`)
+- **Badge y Nombre del Copresidente**: La mesa directiva muestra claramente "Presidente" y "Copresidente".
+- **Botón de Descarga Rápida de Guía**: En la parte inferior de la tarjeta (junto al botón "Ver detalles"), se añade un botón directo con ícono de documento PDF (`Guía de Estudio` / `Study Guide`) si la comisión dispone de ella.
+
+### B. Vista Pública: Modal Extendido de Comisión
+- **Tarjetas de Liderazgo Rediseñadas**: Retratos en alta resolución con roles institucionales distintivos ("Presidente" y "Copresidente") y función de ampliación fotográfica (lightbox).
+- **Módulo de Discursos de Bienvenida (Editorial Block)**:
+  - Presentación visual estilo carta editorial con tipografía contrastada, comillas estilizadas y espaciado generoso.
+  - Pestañas o bloques armónicos para alternar o visualizar el saludo del Presidente y del Copresidente.
+- **Banner de Descarga de la Guía Académica**:
+  - Caja destacada con estilo sobrio institucional (fondo pizarra suave, borde sutil, botón de descarga con peso visual primario, indicando el formato oficial PDF).
+
+### C. Panel Administrativo (`AdminDashboard.tsx`)
+- **Formulario de Comisión Actualizado**:
+  - Etiquetas renombradas a "Nombre del Copresidente" y "Foto del Copresidente".
+  - Dos nuevas áreas de texto tipo párrafo (`textarea`):
+    - *Discurso de Bienvenida del Presidente* (placeholder orientativo, conteo de caracteres).
+    - *Discurso de Bienvenida del Copresidente* (placeholder orientativo, conteo de caracteres).
+  - Control de carga para la Guía de Estudio (`DocumentUploadField` adaptado): selector entre arrastrar/subir archivo PDF local o pegar un enlace web directo.
+
+---
+
+## 3. Decisiones Técnicas y de Persistencia
+
+1. **Compatibilidad Hacia Atrás en la Base de Datos**:
+   - En las tablas de comisiones (`sqlite`, `postgres`, `mysql`), las columnas existentes `vicepresident_name` y `vicepresident_photo` se conservan internamente y se mapean/aliasen transparentemente a `copresident_name` y `copresident_photo` en la API y frontend para evitar cualquier pérdida o migración riesgosa de datos previos.
+2. **Nuevos Campos de Esquema**:
+   - `president_welcome TEXT`
+   - `copresident_welcome TEXT`
+   - `study_guide_url TEXT`
+3. **Migración Automática y No Destructiva**:
+   - Ejecución de bloques `ALTER TABLE committees ADD COLUMN ...` protegidos con `try/catch` durante el arranque del servidor, asegurando que las bases de datos existentes se actualicen al instante sin reiniciar datos.
+
+---
+
+## 4. Arquitectura y Flujo de Datos
+
 ```
-- Verificar que las banderas de bundling de `esbuild` (`--bundle --platform=node --format=cjs --packages=external --sourcemap`) sigan funcionando de manera idéntica y sin advertencias en `esbuild 0.28.x`.
-- Comprobar compatibilidad con `tsx@^4.21.0` y `vite@^6.2.3`.
-
-### C. Guía de Despliegue para Hostinger
-- Una vez actualizado y verificado en el repositorio, al hacer push al branch principal o sincronizar en el panel de Hostinger:
-  1. Ejecutar `npm install` (o `npm audit fix`).
-  2. Ejecutar `npm run build`.
-  3. Ejecutar nuevamente el escaneo de vulnerabilidades en el panel de Hostinger para verificar que el indicador cambie a 0 vulnerabilidades (en verde).
+┌────────────────────────────────────────────────────────────────────────┐
+│                        PANEL DE ADMINISTRACIÓN                         │
+│  - Campos: Nombre & Foto Copresidente                                  │
+│  - Textarea: Discurso Presidente & Copresidente                        │
+│  - Control: Carga PDF (Base64) o Enlace URL de Guía de Estudio         │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ PUT/POST /api/admin/committees
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       EXPRESS BACKEND & DATABASE                       │
+│  - Migración: Añadir president_welcome, copresident_welcome,           │
+│    study_guide_url a tabla 'committees'                               │
+│  - Endpoints CRUD actualizados y serialización a JSON público          │
+│  - Soporte de respaldo / snapshot institucional                        │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ GET /api/public/data
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                         PORTAL PÚBLICO BIMUN                           │
+│  - Tarjeta de Comisión: Botón directo de descarga Guía PDF             │
+│  - Modal Detalle:                                                      │
+│      * Mesa Directiva: Presidente & Copresidente (con lightbox)        │
+│      * Discursos de Bienvenida en formato editorial                    │
+│      * Módulo destacado de Descarga de Guía Oficial PDF               │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 3. Plan de Verificación
+## Plan de Verificación
 
-1. **Instalación y Verificación de Versión**:
-   - Confirmar que `npx esbuild --version` reporte `0.28.x`.
-2. **Prueba de Compilación Completa (`npm run build`)**:
-   - Verificar que `vite build` genere los estáticos en `dist/`.
-   - Verificar que `esbuild server.ts ...` empaquete `dist/server.cjs` sin errores.
-3. **Prueba de Ejecución del Servidor**:
-   - Arrancar el servidor empaquetado y comprobar el endpoint de salud `/api/health`.
-4. **Verificación de Linters**:
-   - Ejecutar comprobación de tipos `npm run lint` (`tsc --noEmit`).
+1. **Inspección de Esquema y API**:
+   - Comprobar que `/api/public/data` retorne `copresident_name`, `president_welcome`, `copresident_welcome` y `study_guide_url`.
+2. **Prueba en Panel Administrativo**:
+   - Editar una comisión existente, redactar los discursos de bienvenida y cargar/enlazar un PDF de prueba.
+   - Verificar persistencia en base de datos al guardar y recargar la página.
+3. **Prueba en Interfaz Pública**:
+   - Validar que aparezca la palabra "Copresidente" en lugar de "Vicepresidente".
+   - Abrir el modal y corroborar la visualización elegante de los discursos y el visor ampliado de fotos.
+   - Probar la descarga de la Guía de Estudio desde la tarjeta exterior y desde el modal.
+4. **Compilación y Linteo**:
+   - Ejecutar `compile_applet` y `lint_applet` para confirmar cero errores de sintaxis y tipos en TypeScript.

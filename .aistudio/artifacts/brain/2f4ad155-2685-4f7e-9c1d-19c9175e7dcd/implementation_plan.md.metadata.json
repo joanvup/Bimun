@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de remediación y actualización de la dependencia vulnerable esbuild a la versión segura 0.28.1+ requerida por el escaneo de seguridad de Hostinger (vulnerabilidad GHSA-gv7w-rqvm-qjhr), garantizando la compatibilidad con el empaquetado de producción de Vite y el servidor backend.",
-  "updatedAt":  "2026-09-26T13:47:37.879792395Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Plan de implementación para la actualización institucional de Comisiones: cambio de Vicepresidente a Copresidente en todo el portal y panel CMS, incorporación de áreas de texto para los discursos de bienvenida del Presidente y Copresidente, y control de carga dual (archivo PDF directo o enlace URL) de la Guía de Estudio del comité con botones de descarga tanto en la cuadrícula de comisiones como en el modal de detalle.",
+  "updatedAt": "2026-10-14T16:07:40.709046694Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

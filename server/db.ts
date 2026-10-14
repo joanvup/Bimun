@@ -10,8 +10,16 @@ import {
   getDatabaseStatus,
 } from './dbManager.ts';
 
+let isInitialized = false;
+
 export async function getDb(): Promise<Database> {
-  return await getSqliteDb();
+  const db = await getSqliteDb();
+  if (!isInitialized) {
+    initSchemaAndSeed(db);
+    isInitialized = true;
+    saveDb();
+  }
+  return db;
 }
 
 export function saveDb(): void {
@@ -99,8 +107,13 @@ function initSchemaAndSeed(db: Database): void {
       topic_c TEXT,
       president_name TEXT,
       president_photo TEXT,
+      copresident_name TEXT,
+      copresident_photo TEXT,
       vicepresident_name TEXT,
       vicepresident_photo TEXT,
+      president_welcome TEXT,
+      copresident_welcome TEXT,
+      study_guide_url TEXT,
       status TEXT DEFAULT 'active',
       sort_order INTEGER DEFAULT 0,
       created_at TEXT NOT NULL
@@ -246,6 +259,68 @@ function initSchemaAndSeed(db: Database): void {
     // Column already exists, ignore
   }
 
+  try {
+    db.run("ALTER TABLE committees ADD COLUMN copresident_name TEXT;");
+  } catch (e) {}
+  try {
+    db.run("ALTER TABLE committees ADD COLUMN copresident_photo TEXT;");
+  } catch (e) {}
+  try {
+    db.run("ALTER TABLE committees ADD COLUMN president_welcome TEXT;");
+  } catch (e) {}
+  try {
+    db.run("ALTER TABLE committees ADD COLUMN copresident_welcome TEXT;");
+  } catch (e) {}
+  try {
+    db.run("ALTER TABLE committees ADD COLUMN study_guide_url TEXT;");
+  } catch (e) {}
+
+  // Synchronize copresident and vicepresident fields for full backwards/forwards compatibility
+  try {
+    db.run(`UPDATE committees SET copresident_name = vicepresident_name WHERE (copresident_name IS NULL OR copresident_name = '') AND vicepresident_name IS NOT NULL AND vicepresident_name != '';`);
+    db.run(`UPDATE committees SET copresident_photo = vicepresident_photo WHERE (copresident_photo IS NULL OR copresident_photo = '') AND vicepresident_photo IS NOT NULL AND vicepresident_photo != '';`);
+    db.run(`UPDATE committees SET vicepresident_name = copresident_name WHERE (vicepresident_name IS NULL OR vicepresident_name = '') AND copresident_name IS NOT NULL AND copresident_name != '';`);
+    db.run(`UPDATE committees SET vicepresident_photo = copresident_photo WHERE (vicepresident_photo IS NULL OR vicepresident_photo = '') AND copresident_photo IS NOT NULL AND copresident_photo != '';`);
+  } catch (e) {}
+
+  // Populate sample welcome speeches and official study guides for initial committees if empty
+  try {
+    db.run(`
+      UPDATE committees 
+      SET 
+        president_welcome = CASE 
+          WHEN (president_welcome IS NULL OR president_welcome = '') AND code = 'DISEC' THEN 
+            'Estimados delegados y delegadas:\n\nEs un verdadero honor darles la más cordial bienvenida a la Primera Comisión de la Asamblea General (DISEC) en BIMUN XXVI. En un orden internacional desafiado por la proliferación tecnológica y nuevas doctrinas estratégicas, su rigor académico, capacidad de consenso y empatía diplomática serán los pilares que permitirán construir resoluciones con impacto real.\n\nLos invito a abordar cada sesión con pasión, preparación exhaustiva y respeto mutuo. ¡Muchos éxitos en sus deliberaciones!'
+          WHEN (president_welcome IS NULL OR president_welcome = '') AND code = 'UNSC' THEN 
+            'Distinguished Delegates:\n\nOn behalf of the Dais, it is our distinct privilege to welcome you to the United Nations Security Council at BIMUN XXVI. The Council addresses urgent geopolitical crises demanding decisive multilateral action and visionary leadership. We expect each representative to embody the values of the UN Charter, analyze complex realities objectively, and negotiate solutions that secure international peace.\n\nWelcome to an unforgettable diplomatic experience.'
+          WHEN (president_welcome IS NULL OR president_welcome = '') AND (code = 'ECOSOC' OR abbreviation LIKE '%ECOSOC%') THEN
+            'Apreciados delegados:\n\nBienvenidos al Consejo Económico y Social de BIMUN XXVI. La sostenibilidad global, la transición energética justa y la equidad social demandan hoy más que nunca soluciones innovadoras y viables. Esta comisión será un espacio vibrante para el debate propositivo y la cooperación internacional.'
+          WHEN (president_welcome IS NULL OR president_welcome = '') THEN 
+            'Apreciados delegados:\n\nLa mesa directiva les extiende una cálida bienvenida a esta comisión en BIMUN XXVI. Confiamos plenamente en que sus debates se caracterizarán por la rigurosidad investigativa, la elocuencia y el compromiso con los más altos valores diplomáticos.'
+          ELSE president_welcome
+        END,
+        copresident_welcome = CASE
+          WHEN (copresident_welcome IS NULL OR copresident_welcome = '') AND code = 'DISEC' THEN
+            'Estimados diplomáticos:\n\nDesde la Copresidencia de DISEC les auguro jornadas de debate sumamente enriquecedoras. Recuerden que el arte de la diplomacia radica en edificar consensos donde las diferencias parecen insalvables. Hemos preparado minuciosamente la guía de estudio para apoyar su preparación y estamos a su entera disposición durante todo el modelo.'
+          WHEN (copresident_welcome IS NULL OR copresident_welcome = '') AND code = 'UNSC' THEN
+            'Distinguished Representatives:\n\nAs Co-Chair of the Security Council, I encourage you to immerse yourselves in the study guide, anticipate crisis directives, and build decisive coalitions. BIMUN XXVI is the forum where your diplomatic skills will shine. We look forward to hearing your speeches and reviewing your draft resolutions.'
+          WHEN (copresident_welcome IS NULL OR copresident_welcome = '') AND (code = 'ECOSOC' OR abbreviation LIKE '%ECOSOC%') THEN
+            'Estimados delegados:\n\nDesde la Copresidencia de ECOSOC los invito a fundamentar cada argumento en datos fidedignos y consensos viables. La economía y el desarrollo sostenible necesitan la visión fresca y audaz de las nuevas generaciones.'
+          WHEN (copresident_welcome IS NULL OR copresident_welcome = '') THEN
+            'Estimados delegados:\n\nDesde la Copresidencia les reiteramos nuestro respaldo incondicional en cada etapa del debate. Aprovechen este espacio para enriquecer su pensamiento crítico, forjar alianzas constructivas y vivir al máximo la experiencia BIMUN.'
+          ELSE copresident_welcome
+        END,
+        study_guide_url = CASE
+          WHEN (study_guide_url IS NULL OR study_guide_url = '') AND code = 'DISEC' THEN
+            'https://www.un.org/disarmament/wp-content/uploads/2020/06/disarmament-study-guide-un.pdf'
+          WHEN (study_guide_url IS NULL OR study_guide_url = '') AND code = 'UNSC' THEN
+            'https://www.un.org/securitycouncil/sites/www.un.org.securitycouncil/files/unsc_provisional_rules_procedure.pdf'
+          ELSE study_guide_url
+        END
+      WHERE id IS NOT NULL;
+    `);
+  } catch (e) {}
+
   // 12. Users Table
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -333,6 +408,18 @@ function initSchemaAndSeed(db: Database): void {
     }
   } catch (err) {
     console.error('Error verifying gallery_categories:', err);
+  }
+
+  // Auto-healing check: guarantee committees has records if empty
+  try {
+    const comCheck = db.exec("SELECT COUNT(*) as count FROM committees;");
+    const comCount = comCheck.length > 0 && comCheck[0].values.length > 0 ? Number(comCheck[0].values[0][0]) : 0;
+    if (comCount === 0) {
+      console.log('committees is empty, seeding default BIMUN committees...');
+      seedDefaultCommittees(db);
+    }
+  } catch (err) {
+    console.error('Error verifying committees:', err);
   }
 }
 
@@ -452,6 +539,199 @@ export function resetDefaultGallery(): { success: boolean; itemsCount: number } 
   return { success: true, itemsCount: DEFAULT_GALLERY_ITEMS.length };
 }
 
+export const DEFAULT_COMMITTEES = [
+  {
+    id: 'com_ag',
+    code: 'DISEC',
+    name: 'Asamblea General (Primera Comisión: Desarme y Seguridad Internacional)',
+    abbreviation: 'DISEC / AG',
+    description: 'Órgano deliberativo principal de las Naciones Unidas donde todos los Estados Miembros tienen igual representación. Aborda los desafíos armamentistas emergentes, ciberdefensa y la no proliferación nuclear.',
+    image_url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
+    language: 'Español',
+    topic_a: 'Regulación del uso militar de la Inteligencia Artificial y armas autónomas en zonas de conflicto',
+    topic_b: 'Militarización del espacio ultraterrestre y mecanismos de prevención de conflictos satelitales',
+    topic_c: 'Control del tráfico ilícito de armas ligeras en el hemisferio occidental',
+    president_name: 'Mariana Sofia Castro',
+    president_photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Santiago Morales Guerra',
+    copresident_photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Estimados delegados y delegadas:\n\nEs un verdadero honor darles la más cordial bienvenida a la Primera Comisión de la Asamblea General (DISEC) en BIMUN XXVI. En un orden internacional desafiado por la proliferación tecnológica y nuevas doctrinas estratégicas, su rigor académico, capacidad de consenso y empatía diplomática serán los pilares que permitirán construir resoluciones con impacto real.\n\nLos invito a abordar cada sesión con pasión, preparación exhaustiva y respeto mutuo. ¡Muchos éxitos en sus deliberaciones!',
+    copresident_welcome: 'Estimados diplomáticos:\n\nDesde la Copresidencia de DISEC les auguro jornadas de debate sumamente enriquecedoras. Recuerden que el arte de la diplomacia radica en edificar consensos donde las diferencias parecen insalvables. Hemos preparado minuciosamente la guía de estudio para apoyar su preparación y estamos a su entera disposición durante todo el modelo.',
+    study_guide_url: 'https://www.un.org/disarmament/wp-content/uploads/2020/06/disarmament-study-guide-un.pdf',
+    status: 'active',
+    sort_order: 1,
+  },
+  {
+    id: 'com_cs',
+    code: 'UNSC',
+    name: 'Consejo de Seguridad de las Naciones Unidas',
+    abbreviation: 'CSNU / UNSC',
+    description: 'El órgano con la responsabilidad primordial de mantener la paz y la seguridad internacionales. Con 15 miembros con poder de resolución vinculante y derecho de veto.',
+    image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80',
+    language: 'English',
+    topic_a: 'Mitigating maritime security threats and escalation in critical trade straits and chokepoints',
+    topic_b: 'Humanitarian corridors and ceasefire verification mechanisms in persistent civil wars',
+    topic_c: 'Reform of the Security Council permanent membership and the veto privilege',
+    president_name: 'David Alejandro Dangond',
+    president_photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Valeria Cotes Lacouture',
+    copresident_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Distinguished Delegates:\n\nOn behalf of the Dais, it is our distinct privilege to welcome you to the United Nations Security Council at BIMUN XXVI. The Council addresses urgent geopolitical crises demanding decisive multilateral action and visionary leadership. We expect each representative to embody the values of the UN Charter, analyze complex realities objectively, and negotiate solutions that secure international peace.\n\nWelcome to an unforgettable diplomatic experience.',
+    copresident_welcome: 'Distinguished Representatives:\n\nAs Co-Chair of the Security Council, I encourage you to immerse yourselves in the study guide, anticipate crisis directives, and build decisive coalitions. BIMUN XXVI is the forum where your diplomatic skills will shine. We look forward to hearing your speeches and reviewing your draft resolutions.',
+    study_guide_url: 'https://www.un.org/securitycouncil/sites/www.un.org.securitycouncil/files/unsc_provisional_rules_procedure.pdf',
+    status: 'active',
+    sort_order: 2,
+  },
+  {
+    id: 'com_ecosoc',
+    code: 'ECOSOC',
+    name: 'Consejo Económico y Social',
+    abbreviation: 'ECOSOC',
+    description: 'Encargado de la coordinación y recomendación económica, ambiental y social para avanzar hacia el cumplimiento integral de los Objetivos de Desarrollo Sostenible.',
+    image_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
+    language: 'Español',
+    topic_a: 'Transición energética justa y financiamiento verde para economías en desarrollo en América Latina y el Caribe',
+    topic_b: 'Impacto macroeconómico del endeudamiento soberano e inflación en la soberanía alimentaria',
+    topic_c: 'Integración laboral juvenil y formalización del trabajo en la economía digital',
+    president_name: 'Isabella Baute Maestre',
+    president_photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Andrés Felipe Orozco',
+    copresident_photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Apreciados delegados y delegadas:\n\nBienvenidos al Consejo Económico y Social de BIMUN XXVI. La sostenibilidad global, la transición energética justa y la equidad social demandan hoy más que nunca soluciones innovadoras y viables. Esta comisión será un espacio vibrante para el debate propositivo y la cooperación internacional.',
+    copresident_welcome: 'Estimados delegados:\n\nDesde la Copresidencia de ECOSOC los invito a fundamentar cada argumento en datos fidedignos y consensos viables. La economía y el desarrollo sostenible necesitan la visión fresca y audaz de las nuevas generaciones.',
+    study_guide_url: 'https://www.un.org/ecosoc/sites/www.un.org.ecosoc/files/files/en/2023doc/ecosoc-mandate-guide.pdf',
+    status: 'active',
+    sort_order: 3,
+  },
+  {
+    id: 'com_unesco',
+    code: 'UNESCO',
+    name: 'Organización de las Naciones Unidas para la Educación, la Ciencia y la Cultura',
+    abbreviation: 'UNESCO',
+    description: 'Promueve la paz y la seguridad mundial mediante la educación intercultural, la difusión de la ciencia y la preservación incondicional del patrimonio histórico.',
+    image_url: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=600&q=80',
+    language: 'Español',
+    topic_a: 'Protección y repatriación del patrimonio cultural material e inmaterial en territorios de posconflicto',
+    topic_b: 'Garantía del acceso universal a la educación científica para niñas y comunidades rurales marginadas',
+    topic_c: 'Preservación de lenguas indígenas originarias frente a la homogeneización digital',
+    president_name: 'Camila Rodriguez Quintero',
+    president_photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Juan Pablo Zuleta',
+    copresident_photo: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Estimadas delegaciones:\n\nLa cultura, la ciencia y la educación constituyen las defensas más sólidas de la paz en la mente de los seres humanos. En UNESCO los animamos a debatir con altura, protegiendo las identidades y saberes ancestrales de nuestros pueblos.',
+    copresident_welcome: 'Estimados delegados:\n\nDesde la Copresidencia de UNESCO los instamos a defender con elocuencia y empatía los derechos culturales de la humanidad. Su voz será la fuerza que impulse acuerdos duraderos.',
+    study_guide_url: 'https://unesdoc.unesco.org/ark:/48223/pf0000374046/PDF/374046spa.pdf.multi',
+    status: 'active',
+    sort_order: 4,
+  },
+  {
+    id: 'com_unicef',
+    code: 'UNICEF',
+    name: 'Fondo de las Naciones Unidas para la Infancia',
+    abbreviation: 'UNICEF',
+    description: 'Organismo dedicado a la protección de los derechos de la niñez y la adolescencia en más de 190 países y territorios, salvando vidas y garantizando su desarrollo integral.',
+    image_url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=600&q=80',
+    language: 'Español',
+    topic_a: 'Protección de la infancia en flujos migratorios transfronterizos y prevención del reclutamiento ilícito',
+    topic_b: 'Erradicación de la desnutrición infantil crónica y seguridad hídrica en comunidades vulnerables',
+    topic_c: 'Protección de menores ante la explotación y el ciberacoso en plataformas digitales emergentes',
+    president_name: 'Lucia Fernanda Cuello',
+    president_photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Mateo Jose Hinojosa',
+    copresident_photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Apreciados delegados y delegadas:\n\nNinguna causa es más noble que la defensa irrestricta de los niños, niñas y adolescentes. Sean rigurosos en su argumentación y sensibles ante las realidades humanitarias que aquejan a la infancia mundial.',
+    copresident_welcome: 'Bienvenidos a UNICEF:\n\nComo Copresidente, los aliento a presentar soluciones pragmáticas y medibles. Las resoluciones que forjen en esta comisión reflejarán su compromiso ético como líderes del mañana.',
+    study_guide_url: 'https://www.unicef.org/media/132441/file/UNICEF_Annual_Report_2022_Executive_Summary.pdf',
+    status: 'active',
+    sort_order: 5,
+  },
+  {
+    id: 'com_who',
+    code: 'WHO',
+    name: 'World Health Organization',
+    abbreviation: 'WHO / OMS',
+    description: 'Directing and coordinating authority on international health work within the United Nations system, promoting universal health coverage and epidemic containment.',
+    image_url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80',
+    language: 'English',
+    topic_a: 'Establishing an enforceable global pandemic treaty and equitable access to pathogen genomic data',
+    topic_b: 'Addressing antimicrobial resistance (AMR) in global food supply chains and clinical settings',
+    topic_c: 'Youth mental health epidemics fueled by digital hyperconnectivity and social isolation',
+    president_name: 'Gabriel Enrique Mejia',
+    president_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Natalia Sofía Maya',
+    copresident_photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Honorable Delegates:\n\nGlobal health challenges transcend borders. As President of the WHO, I encourage you to craft evidence-based policies and foster equitable international frameworks that protect human life worldwide.',
+    copresident_welcome: 'Distinguished Delegates:\n\nFrom the Co-Chair dais, welcome to the World Health Organization. We look forward to rigorous debates, sharp scientific reasoning, and collaborative resolution drafting.',
+    study_guide_url: 'https://iris.who.int/bitstream/handle/10665/367123/9789240071377-eng.pdf',
+    status: 'active',
+    sort_order: 6,
+  },
+  {
+    id: 'com_unwomen',
+    code: 'UNWOMEN',
+    name: 'ONU Mujeres (Entidad para la Igualdad de Género y el Empoderamiento)',
+    abbreviation: 'UN Women',
+    description: 'Lidera esfuerzos globales para defender los derechos de las mujeres y niñas, erradicar la violencia de género e impulsar su participación en la toma de decisiones.',
+    image_url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=600&q=80',
+    language: 'Español',
+    topic_a: 'Participación femenina en mesas de negociación de paz y reconstrucción constitucional',
+    topic_b: 'Cierre de la brecha salarial y reconocimiento del trabajo de cuidados no remunerado',
+    topic_c: 'Protección integral a defensoras de derechos humanos y líderes ambientales',
+    president_name: 'Valentina Perez Soto',
+    president_photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Alejandro Daza Fuentes',
+    copresident_photo: 'https://images.unsplash.com/photo-1463453091185-61582044d556?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Apreciadas delegadas y delegados:\n\nLa igualdad de género no es solo un derecho fundamental, sino la base indispensable para un mundo pacífico, próspero y sostenible. En ONU Mujeres esperamos de ustedes debates de vanguardia y resoluciones audaces.',
+    copresident_welcome: 'Estimadas delegaciones:\n\nLa Copresidencia les brinda un cálido saludo. Forjemos en estas sesiones políticas inclusivas que transformen realidades para millones de mujeres y niñas en el mundo.',
+    study_guide_url: 'https://www.unwomen.org/sites/default/files/2023-09/progress-on-the-sustainable-development-goals-the-gender-snapshot-2023-es.pdf',
+    status: 'active',
+    sort_order: 7,
+  },
+  {
+    id: 'com_crisis',
+    code: 'CRISIS',
+    name: 'Gabinete de Crisis Contemporáneo: Consejo Ártico y Recursos Estratégicos',
+    abbreviation: 'Crisis Committee',
+    description: 'Comité dinámico y de ritmo acelerado con directivas continuas, actualizaciones en tiempo real y toma de decisiones táctica ante escaladas de tensión geopolítica.',
+    image_url: 'https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=600&q=80',
+    language: 'Bilingüe (ES/EN)',
+    topic_a: 'Disputa de soberanía sobre rutas marítimas de paso noroccidental y depósitos de hidrocarburos árticos',
+    topic_b: 'Gestión de crisis ante incidente submarino no declarado en el lecho polar',
+    topic_c: 'Regulación de flotas pesqueras no reguladas y contingencia ecológica por deshielo',
+    president_name: 'Carlos Alberto Ustariz',
+    president_photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80',
+    copresident_name: 'Daniela Gomez Pavajeau',
+    copresident_photo: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=300&q=80',
+    president_welcome: 'Delegados de Crisis:\n\nAquí la diplomacia se mide en minutos y cada decisión tiene repercusiones inmediatas. Prepárense para contingencias imprevistas, directivas audaces y alianzas estratégicas.',
+    copresident_welcome: 'Estimados delegados:\n\nDesde la Copresidencia de Crisis les exigiremos agilidad mental, serenidad bajo presión y una visión estratégica implacable. ¡Bienvenidos al gabinete más vertiginoso de BIMUN!',
+    study_guide_url: 'https://www.un.org/depts/los/convention_agreements/texts/unclos/unclos_e.pdf',
+    status: 'active',
+    sort_order: 8,
+  },
+];
+
+export function seedDefaultCommittees(db: Database): void {
+  const now = new Date().toISOString();
+  for (const c of DEFAULT_COMMITTEES) {
+    db.run(
+      `INSERT OR REPLACE INTO committees (
+        id, code, name, abbreviation, description, image_url, language,
+        topic_a, topic_b, topic_c, president_name, president_photo,
+        copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
+        president_welcome, copresident_welcome, study_guide_url,
+        status, sort_order, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        c.id, c.code, c.name, c.abbreviation, c.description, c.image_url, c.language,
+        c.topic_a, c.topic_b, c.topic_c, c.president_name, c.president_photo,
+        c.copresident_name, c.copresident_photo, c.copresident_name, c.copresident_photo,
+        c.president_welcome, c.copresident_welcome, c.study_guide_url,
+        c.status, c.sort_order, now
+      ]
+    );
+  }
+}
+
 function seedInitialData(db: Database): void {
   console.log('Seeding initial BIMUN data...');
   const now = new Date().toISOString();
@@ -523,160 +803,7 @@ function seedInitialData(db: Database): void {
   seedDefaultAboutSections(db);
 
   // Committees
-  const initialCommittees = [
-    {
-      id: 'com_ag',
-      code: 'GA',
-      name: 'Asamblea General (Primera Comisión: Desarme y Seguridad Internacional)',
-      abbreviation: 'DISEC / AG',
-      description: 'Órgano deliberativo principal de las Naciones Unidas donde todos los Estados Miembros tienen igual representación. Aborda los desafíos armamentistas emergentes y la no proliferación.',
-      image_url: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
-      language: 'Español',
-      topic_a: 'Regulación del uso militar de la Inteligencia Artificial y armas autónomas en zonas de conflicto',
-      topic_b: 'Militarización del espacio ultraterrestre y mecanismos de prevención de conflictos satelitales',
-      topic_c: 'Control del tráfico ilícito de armas ligeras en el hemisferio occidental',
-      president_name: 'Mariana Sofia Castro',
-      president_photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Santiago Morales Guerra',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 1,
-    },
-    {
-      id: 'com_cs',
-      code: 'UNSC',
-      name: 'Consejo de Seguridad de las Naciones Unidas',
-      abbreviation: 'CSNU / UNSC',
-      description: 'El órgano con la responsabilidad primordial de mantener la paz y la seguridad internacionales. Con 15 miembros con poder de resolución vinculante y derecho de veto.',
-      image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80',
-      language: 'English',
-      topic_a: 'Mitigating maritime security threats and escalation in critical trade straits and chokepoints',
-      topic_b: 'Humanitarian corridors and ceasefire verification mechanisms in persistent civil wars',
-      topic_c: 'Reform of the Security Council permanent membership and the veto privilege',
-      president_name: 'David Alejandro Dangond',
-      president_photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Valeria Cotes Lacouture',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 2,
-    },
-    {
-      id: 'com_ecosoc',
-      code: 'ECOSOC',
-      name: 'Consejo Económico y Social',
-      abbreviation: 'ECOSOC',
-      description: 'Encargado de la coordinación y recomendación económica, ambiental y social para avanzar hacia el cumplimiento integral de los Objetivos de Desarrollo Sostenible.',
-      image_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
-      language: 'Español',
-      topic_a: 'Transición energética justa y financiamiento verde para economías en desarrollo en América Latina y el Caribe',
-      topic_b: 'Impacto macroeconómico del endeudamiento soberano e inflación en la soberanía alimentaria',
-      topic_c: 'Integración laboral juvenil y formalización del trabajo en la economía digital',
-      president_name: 'Isabella Baute Maestre',
-      president_photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Andrés Felipe Orozco',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 3,
-    },
-    {
-      id: 'com_unesco',
-      code: 'UNESCO',
-      name: 'Organización de las Naciones Unidas para la Educación, la Ciencia y la Cultura',
-      abbreviation: 'UNESCO',
-      description: 'Promueve la paz y la seguridad mundial mediante la educación intercultural, la difusión de la ciencia y la preservación incondicional del patrimonio histórico.',
-      image_url: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=600&q=80',
-      language: 'Español',
-      topic_a: 'Protección y repatriación del patrimonio cultural material e inmaterial en territorios de posconflicto',
-      topic_b: 'Garantía del acceso universal a la educación científica para niñas y comunidades rurales marginadas',
-      topic_c: 'Preservación de lenguas indígenas originarias frente a la homogeneización digital',
-      president_name: 'Camila Rodriguez Quintero',
-      president_photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Juan Pablo Zuleta',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 4,
-    },
-    {
-      id: 'com_unicef',
-      code: 'UNICEF',
-      name: 'Fondo de las Naciones Unidas para la Infancia',
-      abbreviation: 'UNICEF',
-      description: 'Organismo dedicado a la protección de los derechos de la niñez y la adolescencia en más de 190 países y territorios, salvando vidas y garantizando su desarrollo.',
-      image_url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=600&q=80',
-      language: 'Español',
-      topic_a: 'Protección de la infancia en flujos migratorios transfronterizos y prevención del reclutamiento ilícito',
-      topic_b: 'Erradicación de la desnutrición infantil crónica y seguridad hídrica en comunidades vulnerables',
-      topic_c: 'Protección de menores ante la explotación y el ciberacoso en plataformas digitales emergentes',
-      president_name: 'Lucia Fernanda Cuello',
-      president_photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Mateo Jose Hinojosa',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 5,
-    },
-    {
-      id: 'com_who',
-      code: 'WHO',
-      name: 'World Health Organization',
-      abbreviation: 'WHO / OMS',
-      description: 'Directing and coordinating authority on international health work within the United Nations system, promoting universal health coverage and epidemic containment.',
-      image_url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80',
-      language: 'English',
-      topic_a: 'Establishing an enforceable global pandemic treaty and equitable access to pathogen genomic data',
-      topic_b: 'Addressing antimicrobial resistance (AMR) in global food supply chains and clinical settings',
-      topic_c: 'Youth mental health epidemics fueled by digital hyperconnectivity and social isolation',
-      president_name: 'Gabriel Enrique Mejia',
-      president_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Natalia Sofía Maya',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 6,
-    },
-    {
-      id: 'com_unwomen',
-      code: 'UNWOMEN',
-      name: 'ONU Mujeres (Entidad para la Igualdad de Género y el Empoderamiento)',
-      abbreviation: 'UN Women',
-      description: 'Lidera esfuerzos globales para defender los derechos de las mujeres y niñas, erradicar la violencia de género e impulsar su participación en la toma de decisiones.',
-      image_url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=600&q=80',
-      language: 'Español',
-      topic_a: 'Participación femenina en mesas de negociación de paz y reconstrucción constitucional',
-      topic_b: 'Cierre de la brecha salarial y reconocimiento del trabajo de cuidados no remunerado',
-      topic_c: 'Protección integral a defensoras de derechos humanos y líderes ambientales',
-      president_name: 'Valentina Perez Soto',
-      president_photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Alejandro Daza Fuentes',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1463453091185-61582044d556?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 7,
-    },
-    {
-      id: 'com_crisis',
-      code: 'CRISIS',
-      name: 'Gabinete de Crisis Contemporáneo: Consejo Ártico y Recursos Estratégicos',
-      abbreviation: 'Crisis Committee',
-      description: 'Comité dinámico y de ritmo acelerado con directivas continuas, actualizaciones en tiempo real y toma de decisiones táctica ante escaladas de tensión geopolítica.',
-      image_url: 'https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=600&q=80',
-      language: 'Bilingüe (ES/EN)',
-      topic_a: 'Disputa de soberanía sobre rutas marítimas de paso noroccidental y depósitos de hidrocarburos árticos',
-      topic_b: 'Gestión de crisis ante incidente submarino no declarado en el lecho polar',
-      topic_c: 'Regulación de flotas pesqueras no reguladas y contingencia ecológica por deshielo',
-      president_name: 'Carlos Alberto Ustariz',
-      president_photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80',
-      vicepresident_name: 'Daniela Gomez Pavajeau',
-      vicepresident_photo: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=300&q=80',
-      status: 'active',
-      sort_order: 8,
-    },
-  ];
-
-  for (const c of initialCommittees) {
-    db.run(
-      `INSERT INTO committees (id, code, name, abbreviation, description, image_url, language, topic_a, topic_b, topic_c, president_name, president_photo, vicepresident_name, vicepresident_photo, status, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [c.id, c.code, c.name, c.abbreviation, c.description, c.image_url, c.language, c.topic_a, c.topic_b, c.topic_c, c.president_name, c.president_photo, c.vicepresident_name, c.vicepresident_photo, c.status, c.sort_order, now]
-    );
-  }
+  seedDefaultCommittees(db);
 
   // Countries
   const initialCountries = [

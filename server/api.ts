@@ -528,8 +528,13 @@ apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
       topic_c,
       president_name,
       president_photo,
+      copresident_name,
+      copresident_photo,
       vicepresident_name,
       vicepresident_photo,
+      president_welcome,
+      copresident_welcome,
+      study_guide_url,
       status,
       sort_order,
     } = req.body;
@@ -540,13 +545,17 @@ apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
 
     const id = 'com_' + Date.now();
     const now = new Date().toISOString();
+    const resolvedCopresidentName = copresident_name || vicepresident_name || '';
+    const resolvedCopresidentPhoto = copresident_photo || vicepresident_photo || '';
 
     await executeRunSql(
       `INSERT INTO committees (
         id, code, name, abbreviation, description, image_url, language,
         topic_a, topic_b, topic_c, president_name, president_photo,
-        vicepresident_name, vicepresident_photo, status, sort_order, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
+        president_welcome, copresident_welcome, study_guide_url,
+        status, sort_order, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         code.trim().toUpperCase(),
@@ -560,8 +569,13 @@ apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
         topic_c || '',
         president_name || '',
         president_photo || '',
-        vicepresident_name || '',
-        vicepresident_photo || '',
+        resolvedCopresidentName,
+        resolvedCopresidentPhoto,
+        resolvedCopresidentName,
+        resolvedCopresidentPhoto,
+        president_welcome || '',
+        copresident_welcome || '',
+        study_guide_url || '',
         status || 'active',
         sort_order || 0,
         now,
@@ -589,17 +603,27 @@ apiRouter.put('/admin/committees/:id', authMiddleware, async (req, res) => {
       topic_c,
       president_name,
       president_photo,
+      copresident_name,
+      copresident_photo,
       vicepresident_name,
       vicepresident_photo,
+      president_welcome,
+      copresident_welcome,
+      study_guide_url,
       status,
       sort_order,
     } = req.body;
+
+    const resolvedCopresidentName = copresident_name || vicepresident_name || '';
+    const resolvedCopresidentPhoto = copresident_photo || vicepresident_photo || '';
 
     await executeRunSql(
       `UPDATE committees SET
         code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
         topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?, president_photo = ?,
-        vicepresident_name = ?, vicepresident_photo = ?, status = ?, sort_order = ?
+        copresident_name = ?, copresident_photo = ?, vicepresident_name = ?, vicepresident_photo = ?,
+        president_welcome = ?, copresident_welcome = ?, study_guide_url = ?,
+        status = ?, sort_order = ?
        WHERE id = ?`,
       [
         code,
@@ -613,8 +637,13 @@ apiRouter.put('/admin/committees/:id', authMiddleware, async (req, res) => {
         topic_c,
         president_name,
         president_photo,
-        vicepresident_name,
-        vicepresident_photo,
+        resolvedCopresidentName,
+        resolvedCopresidentPhoto,
+        resolvedCopresidentName,
+        resolvedCopresidentPhoto,
+        president_welcome || '',
+        copresident_welcome || '',
+        study_guide_url || '',
         status,
         sort_order,
         id,
@@ -638,13 +667,17 @@ apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, async (req, re
     const newCode = (com.code + '_COPIA').substring(0, 15);
     const newName = com.name + ' (Copia)';
     const now = new Date().toISOString();
+    const resolvedCopresidentName = com.copresident_name || com.vicepresident_name || '';
+    const resolvedCopresidentPhoto = com.copresident_photo || com.vicepresident_photo || '';
 
     await executeRunSql(
       `INSERT INTO committees (
         id, code, name, abbreviation, description, image_url, language,
         topic_a, topic_b, topic_c, president_name, president_photo,
-        vicepresident_name, vicepresident_photo, status, sort_order, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
+        president_welcome, copresident_welcome, study_guide_url,
+        status, sort_order, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newId,
         newCode,
@@ -658,10 +691,15 @@ apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, async (req, re
         com.topic_c,
         com.president_name,
         com.president_photo,
-        com.vicepresident_name,
-        com.vicepresident_photo,
+        resolvedCopresidentName,
+        resolvedCopresidentPhoto,
+        resolvedCopresidentName,
+        resolvedCopresidentPhoto,
+        com.president_welcome || '',
+        com.copresident_welcome || '',
+        com.study_guide_url || '',
         'draft',
-        com.sort_order + 1,
+        (com.sort_order || 0) + 1,
         now,
       ]
     );

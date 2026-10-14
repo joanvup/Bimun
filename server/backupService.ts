@@ -320,12 +320,17 @@ export async function restoreFullBackup(
         `INSERT INTO committees (
           id, code, name, abbreviation, description, image_url, language,
           topic_a, topic_b, topic_c, president_name, president_photo,
-          vicepresident_name, vicepresident_photo, status, sort_order, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
+          president_welcome, copresident_welcome, study_guide_url,
+          status, sort_order, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           com.id, com.code, com.name, com.abbreviation, com.description, com.image_url || '', com.language || 'Español',
           com.topic_a, com.topic_b || '', com.topic_c || '', com.president_name || '', com.president_photo || '',
-          com.vicepresident_name || '', com.vicepresident_photo || '', com.status || 'active', com.sort_order || 0, com.created_at || new Date().toISOString()
+          com.copresident_name || com.vicepresident_name || '', com.copresident_photo || com.vicepresident_photo || '',
+          com.copresident_name || com.vicepresident_name || '', com.copresident_photo || com.vicepresident_photo || '',
+          com.president_welcome || '', com.copresident_welcome || '', com.study_guide_url || '',
+          com.status || 'active', com.sort_order || 0, com.created_at || new Date().toISOString()
         ]
       );
     }

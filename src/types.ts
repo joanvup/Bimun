@@ -78,8 +78,13 @@ export interface Committee {
   topic_c: string;
   president_name: string;
   president_photo: string;
-  vicepresident_name: string;
-  vicepresident_photo: string;
+  copresident_name?: string;
+  copresident_photo?: string;
+  vicepresident_name?: string;
+  vicepresident_photo?: string;
+  president_welcome?: string;
+  copresident_welcome?: string;
+  study_guide_url?: string;
   status: 'active' | 'inactive' | 'draft' | 'archived';
   sort_order: number;
   created_at?: string;

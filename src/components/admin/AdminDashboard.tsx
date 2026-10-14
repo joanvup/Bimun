@@ -1808,7 +1808,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       topic_b: '',
                       topic_c: '',
                       president_name: '',
+                      president_photo: '',
+                      copresident_name: '',
+                      copresident_photo: '',
                       vicepresident_name: '',
+                      vicepresident_photo: '',
+                      president_welcome: '',
+                      copresident_welcome: '',
+                      study_guide_url: '',
                       status: 'active',
                       sort_order: committees.length + 1,
                     })
@@ -1853,10 +1860,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400">
-                        Pres: <strong className="text-slate-200">{com.president_name || 'Sin asignar'}</strong>
-                      </span>
+                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                      <div className="text-xs text-slate-400 space-y-0.5 min-w-0">
+                        <div className="truncate">
+                          Pres: <strong className="text-slate-200">{com.president_name || 'Sin asignar'}</strong>
+                        </div>
+                        <div className="truncate">
+                          Copres: <strong className="text-slate-200">{com.copresident_name || com.vicepresident_name || 'Sin asignar'}</strong>
+                        </div>
+                        {com.study_guide_url && (
+                          <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                            <FileText className="w-3 h-3 shrink-0" />
+                            <span>Guía PDF adjunta</span>
+                          </div>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-1.5">
                         <button
@@ -3362,11 +3380,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400">Nombre Vicepresidente</label>
+                  <label className="text-xs text-slate-400">Nombre Copresidente</label>
                   <input
                     type="text"
-                    value={editingCommittee.vicepresident_name || ''}
-                    onChange={(e) => setEditingCommittee({ ...editingCommittee, vicepresident_name: e.target.value })}
+                    value={editingCommittee.copresident_name || editingCommittee.vicepresident_name || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditingCommittee({
+                        ...editingCommittee,
+                        copresident_name: val,
+                        vicepresident_name: val,
+                      });
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
                   />
                 </div>
@@ -3383,12 +3408,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div className="space-y-1">
                   <ImageUploadField
-                    label="Foto del Vicepresidente"
-                    value={editingCommittee.vicepresident_photo || ''}
-                    onChange={(val) => setEditingCommittee({ ...editingCommittee, vicepresident_photo: val })}
-                    helperText="Foto de perfil del vicepresidente"
+                    label="Foto del Copresidente"
+                    value={editingCommittee.copresident_photo || editingCommittee.vicepresident_photo || ''}
+                    onChange={(val) =>
+                      setEditingCommittee({
+                        ...editingCommittee,
+                        copresident_photo: val,
+                        vicepresident_photo: val,
+                      })
+                    }
+                    helperText="Foto de perfil del copresidente de mesa"
                     aspectRatio="square"
                     maxDimensions={{ width: 400, height: 400 }}
+                  />
+                </div>
+
+                {/* SECCIÓN DISCURSOS DE BIENVENIDA */}
+                <div className="sm:col-span-2 pt-3 border-t border-slate-800 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+                      Discursos de Bienvenida de la Mesa Directiva
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      (Aparecerán en la ficha detallada de la comisión)
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
+                      <span>Discurso de Bienvenida del Presidente</span>
+                      <span className="text-[10px] text-slate-500 font-mono">Párrafo completo</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={editingCommittee.president_welcome || ''}
+                      onChange={(e) => setEditingCommittee({ ...editingCommittee, president_welcome: e.target.value })}
+                      placeholder="Escribe el discurso o mensaje de apertura del Presidente dirigido a los delegados..."
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
+                      <span>Discurso de Bienvenida del Copresidente</span>
+                      <span className="text-[10px] text-slate-500 font-mono">Párrafo completo</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={editingCommittee.copresident_welcome || ''}
+                      onChange={(e) => setEditingCommittee({ ...editingCommittee, copresident_welcome: e.target.value })}
+                      placeholder="Escribe el discurso o mensaje de apertura del Copresidente dirigido a los delegados..."
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                {/* SECCIÓN GUÍA DE ESTUDIO (PDF) */}
+                <div className="sm:col-span-2 pt-3 border-t border-slate-800 space-y-2">
+                  <DocumentUploadField
+                    label="Guía de Estudio del Comité (PDF)"
+                    fileUrl={editingCommittee.study_guide_url || ''}
+                    fileSize="PDF Oficial"
+                    maxSizeMb={15}
+                    helperText="Sube el archivo PDF de la guía temática o ingresa un enlace web directo. Estará disponible para descarga por los delegados."
+                    onChange={(url) => setEditingCommittee({ ...editingCommittee, study_guide_url: url })}
                   />
                 </div>
               </div>

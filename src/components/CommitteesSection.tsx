@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, ArrowUpRight, X, ZoomIn, Award } from 'lucide-react';
+import { User, ArrowUpRight, X, ZoomIn, Award, FileText, FileDown, Quote } from 'lucide-react';
 import { Committee } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 
@@ -133,32 +133,48 @@ export const CommitteesSection: React.FC<CommitteesSectionProps> = ({
                   </p>
                 </div>
 
-                {/* Presidents Preview */}
+                {/* Presidents Preview & Actions */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {com.president_photo ? (
                       <img
                         src={com.president_photo}
                         alt={com.president_name}
-                        className="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-700"
+                        className="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-700 shrink-0"
                       />
                     ) : (
-                      <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                      <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center shrink-0">
                         <User className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                       </div>
                     )}
-                    <span className="font-medium truncate max-w-[150px] text-slate-700 dark:text-slate-300">
+                    <span className="font-medium truncate max-w-[120px] sm:max-w-[140px] text-slate-700 dark:text-slate-300">
                       {com.president_name || (language === 'en' ? 'Chair Dais' : 'Presidencia')}
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => setSelectedModalCommittee(com)}
-                    className="text-xs font-bold text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center gap-1 group/btn cursor-pointer"
-                  >
-                    <span>{t.committees.details_btn}</span>
-                    <ArrowUpRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {com.study_guide_url && (
+                      <a
+                        href={com.study_guide_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={`${com.abbreviation}_Guia_Academica.pdf`}
+                        onClick={(e) => e.stopPropagation()}
+                        title={language === 'en' ? 'Download Study Guide (PDF)' : 'Descargar Guía de Estudio (PDF)'}
+                        className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/80 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/70 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{language === 'en' ? 'Guide' : 'Guía PDF'}</span>
+                      </a>
+                    )}
+                    <button
+                      onClick={() => setSelectedModalCommittee(com)}
+                      className="text-xs font-bold text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center gap-1 group/btn cursor-pointer"
+                    >
+                      <span>{t.committees.details_btn}</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -315,35 +331,39 @@ export const CommitteesSection: React.FC<CommitteesSectionProps> = ({
                     </div>
                   </div>
 
-                  {/* Vice-President Card */}
+                  {/* Co-President Card */}
                   <div className="flex flex-col sm:flex-row items-center text-center sm:text-left gap-4 p-5 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-800/40 dark:via-slate-900/80 dark:to-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
                     <button
                       type="button"
-                      onClick={() =>
-                        selectedModalCommittee.vicepresident_photo &&
-                        setSelectedZoomPhoto({
-                          url: selectedModalCommittee.vicepresident_photo,
-                          name: selectedModalCommittee.vicepresident_name || 'Vicepresidente',
-                          role: language === 'en' ? 'Vice-President' : 'Vicepresidente',
-                          committeeName: selectedModalCommittee.name,
-                        })
-                      }
+                      onClick={() => {
+                        const photoUrl = selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo;
+                        if (photoUrl) {
+                          setSelectedZoomPhoto({
+                            url: photoUrl,
+                            name: selectedModalCommittee.copresident_name || selectedModalCommittee.vicepresident_name || (language === 'en' ? 'Co-President' : 'Copresidente'),
+                            role: language === 'en' ? 'Co-President' : 'Copresidente',
+                            committeeName: selectedModalCommittee.name,
+                          });
+                        }
+                      }}
                       className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border-2 border-slate-300 dark:border-slate-700 shadow-md bg-slate-200 dark:bg-slate-800 shrink-0 group/photo transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-slate-400 ${
-                        selectedModalCommittee.vicepresident_photo ? 'cursor-pointer hover:scale-105' : 'cursor-default'
+                        (selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo)
+                          ? 'cursor-pointer hover:scale-105'
+                          : 'cursor-default'
                       }`}
                       title={
-                        selectedModalCommittee.vicepresident_photo
+                        (selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo)
                           ? language === 'en'
                             ? 'Click to enlarge photo'
                             : 'Clic para ampliar fotografía'
                           : undefined
                       }
                     >
-                      {selectedModalCommittee.vicepresident_photo ? (
+                      {(selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo) ? (
                         <>
                           <img
-                            src={selectedModalCommittee.vicepresident_photo}
-                            alt={selectedModalCommittee.vicepresident_name}
+                            src={selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo}
+                            alt={selectedModalCommittee.copresident_name || selectedModalCommittee.vicepresident_name}
                             className="w-full h-full object-cover object-top transition-transform duration-300 group-hover/photo:scale-110"
                           />
                           <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center text-white">
@@ -359,10 +379,12 @@ export const CommitteesSection: React.FC<CommitteesSectionProps> = ({
 
                     <div className="space-y-1.5 min-w-0">
                       <span className="inline-block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                        {language === 'en' ? 'Vice-President' : 'Vicepresidente'}
+                        {language === 'en' ? 'Co-President / Co-Chair' : 'Copresidente'}
                       </span>
                       <h5 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
-                        {selectedModalCommittee.vicepresident_name || (language === 'en' ? 'To be appointed' : 'Por designar')}
+                        {selectedModalCommittee.copresident_name ||
+                          selectedModalCommittee.vicepresident_name ||
+                          (language === 'en' ? 'To be appointed' : 'Por designar')}
                       </h5>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {selectedModalCommittee.abbreviation} • {language === 'en' ? 'Dais Leadership' : 'Mesa Directiva'}
@@ -372,8 +394,134 @@ export const CommitteesSection: React.FC<CommitteesSectionProps> = ({
                 </div>
               </div>
 
+              {/* Guía de Estudio del Comité (Study Guide Card) */}
+              {selectedModalCommittee.study_guide_url && (
+                <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-blue-900/10 via-indigo-900/10 to-blue-900/10 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 border border-blue-200 dark:border-blue-900/60 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 text-center sm:text-left">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/30">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          {language === 'en' ? 'Official Document' : 'Documento Oficial'}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">PDF</span>
+                      </div>
+                      <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                        {language === 'en' ? 'Committee Study Guide' : 'Guía de Estudio del Comité'}
+                      </h4>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        {language === 'en'
+                          ? 'Academic topics, background, debate dynamics, and guiding research questions.'
+                          : 'Temario académico, antecedentes, dinámica de debate y preguntas orientadoras para delegados.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <a
+                    href={selectedModalCommittee.study_guide_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={`${selectedModalCommittee.abbreviation}_Guia_Academica_BIMUN.pdf`}
+                    className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    <span>{language === 'en' ? 'Download Study Guide' : 'Descargar Guía de Estudio (PDF)'}</span>
+                  </a>
+                </div>
+              )}
+
+              {/* Dais Welcome Speeches (Discursos de Bienvenida) */}
+              {(selectedModalCommittee.president_welcome || selectedModalCommittee.copresident_welcome) && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Quote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      {language === 'en' ? 'Dais Welcome Addresses' : 'Discursos de Bienvenida de la Mesa Directiva'}
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {/* President Welcome */}
+                    {selectedModalCommittee.president_welcome && (
+                      <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 relative space-y-3 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          {selectedModalCommittee.president_photo ? (
+                            <img
+                              src={selectedModalCommittee.president_photo}
+                              alt={selectedModalCommittee.president_name}
+                              className="w-10 h-10 rounded-full object-cover border border-blue-400/50 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-blue-600 dark:text-blue-300 shrink-0">
+                              <User className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+                              {language === 'en' ? 'Address by the President' : 'Discurso del Presidente'}
+                            </span>
+                            <h5 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                              {selectedModalCommittee.president_name || (language === 'en' ? 'President' : 'Presidente')}
+                            </h5>
+                          </div>
+                        </div>
+                        <div className="pl-3 border-l-2 border-blue-500/50 text-xs sm:text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed italic">
+                          {selectedModalCommittee.president_welcome}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Copresident Welcome */}
+                    {selectedModalCommittee.copresident_welcome && (
+                      <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 relative space-y-3 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          {(selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo) ? (
+                            <img
+                              src={selectedModalCommittee.copresident_photo || selectedModalCommittee.vicepresident_photo}
+                              alt={selectedModalCommittee.copresident_name || selectedModalCommittee.vicepresident_name}
+                              className="w-10 h-10 rounded-full object-cover border border-indigo-400/50 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-300 shrink-0">
+                              <User className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                              {language === 'en' ? 'Address by the Co-President' : 'Discurso del Copresidente'}
+                            </span>
+                            <h5 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                              {selectedModalCommittee.copresident_name ||
+                                selectedModalCommittee.vicepresident_name ||
+                                (language === 'en' ? 'Co-President' : 'Copresidente')}
+                            </h5>
+                          </div>
+                        </div>
+                        <div className="pl-3 border-l-2 border-indigo-500/50 text-xs sm:text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed italic">
+                          {selectedModalCommittee.copresident_welcome}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-end gap-3">
+                {selectedModalCommittee.study_guide_url && (
+                  <a
+                    href={selectedModalCommittee.study_guide_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={`${selectedModalCommittee.abbreviation}_Guia_Academica_BIMUN.pdf`}
+                    className="px-4 py-2.5 rounded-xl border border-blue-600/40 dark:border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>{language === 'en' ? 'Study Guide (PDF)' : 'Guía de Estudio (PDF)'}</span>
+                  </a>
+                )}
                 <button
                   onClick={() => setSelectedModalCommittee(null)}
                   className="px-4 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 text-xs font-semibold cursor-pointer"
