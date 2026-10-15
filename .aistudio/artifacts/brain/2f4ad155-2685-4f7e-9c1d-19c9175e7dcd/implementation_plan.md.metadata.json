@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación exhaustivo para resolver el problema de guardado de comisiones y desincronización de esquemas en MySQL en producción:\n1. Auto-migración y verificación proactiva de esquemas (todas las columnas de todas las tablas) al inicializar conexiones MySQL y PostgreSQL.\n2. Endpoint administrativo y botón interactivo en la sección de Base de Datos para verificar y sincronizar/reparar columnas faltantes en cualquier momento.\n3. Mecanismo de tolerancia a fallos en el endpoint de guardado y actualización de comisiones (y demás entidades) que detecta columnas faltantes y las crea en caliente antes de reintentar la operación.\n4. Prevención de bloqueos garantizando compatibilidad total con bases de datos MySQL existentes.",
-  "updatedAt": "2026-10-15T12:32:14.159079563Z",
+  "summary": "Plan de implementación para mostrar Presidente, Copresidente con mini-avatars y Guía de Estudio en PDF dentro de la sección Temas de Debate por Comisión.",
+  "updatedAt": "2026-10-15T13:22:16.545322063Z",
   "requestFeedback": true,
   "userFacing": true
 }

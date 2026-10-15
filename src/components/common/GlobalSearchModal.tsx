@@ -122,7 +122,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         id: `com_${c.id}`,
         type: 'committee',
         title: `${c.name} (${c.abbreviation})`,
-        subtitle: `Idioma: ${c.language || 'Español'} • Presidencia: ${c.president_name || 'Mesa Directiva'}`,
+        subtitle: `Idioma: ${c.language || 'Español'} • Presidencia: ${c.president_name || 'Mesa Directiva'}${c.copresident_name || c.vicepresident_name ? ` • Copresidencia: ${c.copresident_name || c.vicepresident_name}` : ''}`,
         category: 'Comité Académico',
         description: [c.description, c.topic_a ? `Tema A: ${c.topic_a}` : '', c.topic_b ? `Tema B: ${c.topic_b}` : '']
           .filter(Boolean)

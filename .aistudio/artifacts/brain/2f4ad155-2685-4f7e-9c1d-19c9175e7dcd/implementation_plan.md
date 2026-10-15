@@ -1,91 +1,48 @@
-# Plan de Corrección: Auto-Migración de Columnas y Guardado de Comisiones en MySQL (Producción)
+# Plan de Implementación: Presidencia, Copresidencia y Guía PDF en Temas de Debate
 
-## 1. Diagnóstico del Problema
+Incorporar en cada tarjeta de la sección "Temas de Debate por Comisión" (`TopicsSection.tsx`) la visualización de la presidencia y copresidencia con fichas de perfil (mini avatar, rol y nombre), así como el acceso directo a la guía académica en formato PDF.
 
-Al editar una comisión y presionar **Guardar Comisión**, la petición falla con error 500 y no persiste los cambios.
+## User Review Required
 
-### Causa Raíz Confirmada
-1. En producción, la base de datos MySQL fue configurada previamente. El archivo `server/dbManager.ts` ejecutaba únicamente `CREATE TABLE IF NOT EXISTS` durante la inicialización de MySQL.
-2. Como las tablas ya existían en el servidor MySQL remoto, `CREATE TABLE IF NOT EXISTS` no altera la estructura de tablas existentes ni agrega columnas nuevas.
-3. Se agregaron recientemente nuevos campos a la entidad de Comisiones:
-   - `study_guide_url` (guía académica en PDF o enlace)
-   - `copresident_name` y `copresident_photo` (copresidencia académica)
-   - `president_welcome` y `copresident_welcome` (discursos de bienvenida)
-4. Cuando el endpoint `PUT /api/admin/committees/:id` o `POST /api/admin/committees` ejecuta:
-   ```sql
-   UPDATE committees SET ..., copresident_name = ?, copresident_photo = ?, president_welcome = ?, copresident_welcome = ?, study_guide_url = ?, ...
-   ```
-   el motor MySQL en producción rechaza la consulta arrojando:
-   `Error de persistencia en MySQL: Unknown column 'study_guide_url' in 'field list'`
-5. Existen columnas equivalentes que también pudieron quedarse desincronizadas en otras tablas de producción (como `payment_receipt` en `registrations`, `additional_info` en `countries`, etc.).
+> [!NOTE]
+> Con base en tus respuestas aclaratorias:
+> - **Liderazgo de Mesa:** Se mostrarán únicamente el **Presidente** y el **Copresidente** (sin incluir vicepresidente adicional).
+> - **Estilo visual:** Fichas elegantes con foto/avatar mini, insignia de rol (badge) y nombre completo. Si tienen foto configurada, se muestra su fotografía; de lo contrario, un icono de usuario con estilo del tema.
+> - **Guía de Estudio:** Si la comisión tiene una guía en PDF cargada (`study_guide_url`), el botón abrirá/descargará directamente el documento en una nueva pestaña. Si no tiene guía aún, se mostrará en estado inactivo o enlazará a la sección general de documentos.
 
 ---
 
-## 2. Objetivos y Respuestas del Usuario
+## Proposed Changes
 
-- **Auto-migración automática al conectar**: Cada vez que el servidor se inicia o se conecta a MySQL (o PostgreSQL), verificará automáticamente todas las tablas y añadirá las columnas que falten sin perder ningún dato.
-- **Botón manual en panel**: En la pestaña de configuración de Base de Datos en el panel administrativo, se habilitará un botón "Verificar y Reparar Columnas en Producción" con informe en tiempo real de columnas agregadas/verificadas.
-- **Cobertura total**: Aplicar la verificación y reparación a **todas las tablas** (`committees`, `registrations`, `countries`, `documents`, `gallery`, `about_sections`, `edition_archives`, `news`, `organizing_team`, etc.).
-- **Tolerancia a fallos en caliente**: En los endpoints de guardado (`PUT/POST /api/admin/committees`), si ocurre un error por columna inexistente, el sistema capturará el error, ejecutará la auto-reparación de la tabla en caliente y reintentará la operación automáticamente antes de responder, garantizando que el usuario jamás quede bloqueado.
+### Interfaz Pública (`src/components/TopicsSection.tsx`)
 
----
-
-## 3. Arquitectura Técnica de la Solución
-
-### A. Función Central de Auto-Migración Universal (`server/dbManager.ts`)
-Crear la función `ensureAllTableColumns(pool, type)` que:
-1. Inspecciona la existencia de columnas usando `information_schema.COLUMNS` para MySQL/PostgreSQL y `PRAGMA table_info` para SQLite.
-2. Define un diccionario exhaustivo con todas las columnas esperadas y sus tipos de datos correspondientes para cada tabla.
-3. Identifica de forma segura las columnas faltantes y ejecuta sentencias `ALTER TABLE [tabla] ADD COLUMN [columna] [tipo]` protegidas para evitar conflictos de concurrencia.
-4. Se ejecuta:
-   - Al establecer la conexión inicial con MySQL / PostgreSQL.
-   - Al invocar la sincronización manual desde el panel.
-   - De manera preventiva / en fallback si un query detecta una columna ausente.
-
-### B. Endpoint Administrativo de Reparación (`server/api.ts`)
-- `POST /api/admin/database/repair-schema`: Endpoint autenticado que ejecuta la verificación integral de todas las tablas en la base de datos activa y devuelve un reporte detallado:
-  - Tablas analizadas.
-  - Columnas añadidas.
-  - Estado del motor (MySQL, PostgreSQL o SQLite).
-
-### C. Tolerancia a Fallos en Endpoints de Comisiones (`server/api.ts`)
-- En `POST /api/admin/committees` y `PUT /api/admin/committees/:id`:
-  - Si el query falla por `ER_BAD_FIELD_ERROR` / `Unknown column`, se invoca inmediatamente `ensureAllTableColumns()` para crear las columnas faltantes en MySQL y se reintenta la actualización.
-  - Si persiste algún problema imprevisto, se aplica un guardado de compatibilidad degradada (guardando los campos base) para no perder los datos del formulario, registrando el evento.
-
-### D. Interfaz de Usuario en el Panel Admin (`src/components/admin/AdminDashboard.tsx`)
-- En la pestaña de **Base de Datos**:
-  - Incorporar tarjeta interactiva: **Diagnóstico y Reparación de Esquema en Producción**.
-  - Botón: "Verificar y Reparar Columnas".
-  - Muestra alerta de estado con las columnas añadidas o confirmadas (e.g. `study_guide_url`, `copresident_name`, `payment_receipt`).
-- En el modal de Comisiones:
-  - Manejo de errores claro con feedback descriptivo en caso de fallos de red o servidor.
+- **Reemplazar la fila inferior simple** (`Presidencia: Nombre` y enlace genérico `#documentos`):
+  1. **Bloque de Mesa Directiva (Presidencia y Copresidencia):**
+     - **Presidente:** Ficha con avatar circular o redondeado (foto de `com.president_photo` o icono por defecto), badge distintivo (ej. "Presidente" / "Chair") y nombre del presidente (`com.president_name`).
+     - **Copresidente:** Ficha con avatar circular o redondeado (foto de `com.copresident_photo` o icono por defecto), badge distintivo ("Copresidente" / "Co-Chair") y nombre del copresidente (`com.copresident_name`). Se mostrará si está configurado en la comisión.
+  2. **Botón de Guía de Estudio en PDF:**
+     - Si la comisión cuenta con `com.study_guide_url`:
+       - Enlace con icono `FileText` / `Download`, estilo de botón atractivo (gradiente suave o borde destacado con hover).
+       - Atributos `target="_blank"` y `rel="noopener noreferrer"` para abrir el PDF directamente o descargarlo.
+       - Texto claro en español e inglés: *"Guía Académica (PDF)"* / *"Study Guide (PDF)"*.
+     - Si aún no cuenta con `study_guide_url`:
+       - Enlace accesible o indicador sutil de guía próxima a publicarse o enlace al repositorio general de documentos.
+  3. **Diseño Responsivo:**
+     - Disposición fluida en móviles (apilado limpio) y pantallas medianas/grandes (flex/grid equilibrado).
+     - Soporte completo para modo claro y modo oscuro.
 
 ---
 
-## 4. Plan de Ejecución Paso a Paso
+## Verification Plan
 
-1. **Actualizar `server/dbManager.ts`**:
-   - Implementar el mapeo exhaustivo de tablas y columnas (con tipos para MySQL, PostgreSQL y SQLite).
-   - Crear `ensureAllTableColumns(activePool, dbType)`.
-   - Conectar `ensureAllTableColumns` dentro de `initMySqlSchema` e `initPostgresSchema` para que ocurra automáticamente al conectar.
-   - Exponer la función para uso externo en endpoints y controladores.
+### Automated Verification
+- Ejecutar `compile_applet` para garantizar que no existan errores de tipos ni de sintaxis en TypeScript.
+- Ejecutar `lint_applet` para verificar buenas prácticas y limpieza de código.
 
-2. **Actualizar `server/api.ts`**:
-   - Agregar ruta `POST /api/admin/database/repair-schema`.
-   - Envolver el guardado y actualización de comisiones con detección y auto-reparación en caliente de columnas faltantes con reintento automático.
-
-3. **Actualizar `src/components/admin/AdminDashboard.tsx`**:
-   - Añadir acción interactiva de "Reparar Esquema de Tablas" con visualización del resultado.
-   - Mejorar mensajes de error al guardar comisiones si la API reporta alguna anomalía.
-
-4. **Compilación y Verificación**:
-   - Ejecutar `compile_applet` para asegurar ausencia de errores de TypeScript y empaquetado Vite.
-   - Probar endpoint y verificar integridad de todas las tablas.
-
----
-
-## 5. Criterios de Aceptación
-- Al guardar o editar comisiones con guías PDF o discursos de bienvenida en MySQL, la operación responde `200 OK` y persiste todos los campos.
-- El servidor ejecuta automáticamente la adición de columnas si no existen en la base de datos remota sin requerir migraciones manuales por consola.
-- El botón de reparación en el panel permite validar el estado del esquema en cualquier momento con un solo clic.
+### Manual Verification
+- Visualizar la sección "Temas de Debate por Comisión" en el navegador:
+  - Verificar que las comisiones con presidente y copresidente muestren ambos perfiles con sus nombres y fotos/avatares.
+  - Comprobar que comisiones sin foto muestren el icono estilizado de fallback.
+  - Verificar que al hacer clic en el botón de la Guía PDF, se abra o descargue directamente el archivo enlazado si existe.
+  - Probar visualización tanto en escritorio como en vista móvil.
+  - Probar en modo oscuro y modo claro.
