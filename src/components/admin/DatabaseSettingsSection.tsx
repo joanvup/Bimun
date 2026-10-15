@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Database, Server, CheckCircle2, AlertTriangle, RefreshCw, Send,
-  ArrowRightLeft, ShieldCheck, Download, HardDrive, Info, Layers, Zap
+  ArrowRightLeft, ShieldCheck, Download, HardDrive, Info, Layers, Zap, Wrench
 } from 'lucide-react';
 import { DatabaseStatus, DatabaseConfig, DatabaseEngineType } from '../../types.ts';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal.tsx';
@@ -38,6 +38,36 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [showMigrateModal, setShowMigrateModal] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<any>(null);
+
+  const handleRepairSchema = async () => {
+    setRepairing(true);
+    setRepairResult(null);
+    try {
+      const res = await authFetch('/api/admin/database/repair-schema', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRepairResult(data.result);
+        onStatusMessage('Esquema verificado y reparado exitosamente en tu base de datos activa.');
+        onDataUpdated();
+      } else {
+        setRepairResult({
+          success: false,
+          message: data.message || data.error || 'Error al verificar esquema',
+        });
+        onStatusMessage(data.message || data.error || 'Error al verificar esquema', 'error');
+      }
+    } catch (err: any) {
+      setRepairResult({
+        success: false,
+        message: err.message || 'Error de conexión con el servidor',
+      });
+      onStatusMessage(err.message, 'error');
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   const handleClearCache = async () => {
     setClearingCache(true);
@@ -572,6 +602,83 @@ export const DatabaseSettingsSection: React.FC<DatabaseSettingsSectionProps> = (
           </button>
         </div>
       </form>
+
+      {/* Schema Verification & Auto-Repair Card */}
+      <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-950/90 to-emerald-950/30 border border-emerald-900/40 space-y-4 shadow-xl shadow-black/20">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Wrench className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-white">
+                  Diagnóstico y Auto-Reparación de Columnas en Producción
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">
+                  {dbStatus?.activeType || 'MySQL'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-2xl">
+                Verifica de forma no destructiva que todas las tablas y columnas creadas en actualizaciones recientes (guías académicas <code className="text-emerald-300 font-mono">study_guide_url</code>, copresidencia <code className="text-emerald-300 font-mono">copresident_name/photo</code>, discursos de bienvenida <code className="text-emerald-300 font-mono">president/copresident_welcome</code>, comprobantes de pago <code className="text-emerald-300 font-mono">payment_receipt</code>, etc.) existan en tu base de datos activa. Si falta alguna columna, el sistema la añade al instante sin riesgo de pérdida de datos.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRepairSchema}
+            disabled={repairing}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 shrink-0 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${repairing ? 'animate-spin' : ''}`} />
+            <span>{repairing ? 'Verificando columnas...' : 'Verificar y Reparar Columnas'}</span>
+          </button>
+        </div>
+
+        {/* Live Repair Feedback */}
+        {repairResult && (
+          <div
+            className={`p-4 rounded-xl border text-xs flex flex-col gap-2 animate-in fade-in ${
+              repairResult.success
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100'
+                : 'bg-rose-950/40 border-rose-500/40 text-rose-100'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {repairResult.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span className="font-bold text-sm">
+                {repairResult.success ? 'Diagnóstico y Sincronización Exitosa' : 'Aviso en la Verificación'}
+              </span>
+            </div>
+            <p className="text-[11px] opacity-90 leading-relaxed">
+              {repairResult.message}
+            </p>
+
+            {repairResult.addedColumns && repairResult.addedColumns.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-emerald-500/20">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1.5">
+                  Columnas agregadas con éxito a tu base de datos de producción:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {repairResult.addedColumns.map((col: any, idx: number) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 rounded-md bg-emerald-900/60 border border-emerald-500/40 text-[10px] font-mono text-emerald-200"
+                    >
+                      {col.table}.{col.column} ({col.type})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Migration Wizard Card */}
       {dbConfig.type !== 'sqlite' && (

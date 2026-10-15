@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
-import { executeQueryAll, executeQueryOne, executeRunSql, initializeDatabaseManager, ensureDefaultAdmin } from './dbManager.ts';
+import { executeQueryAll, executeQueryOne, executeRunSql, initializeDatabaseManager, ensureDefaultAdmin, ensureAllTableColumns } from './dbManager.ts';
 
 // Helper to save base64 files to disk in /uploads/documents
 export function saveBase64File(base64Data: string, prefix = 'doc'): string {
@@ -611,39 +611,104 @@ apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
       ? saveBase64File(study_guide_url, `guia_${code.toLowerCase().replace(/[^a-z0-9]/g, '_')}`)
       : (study_guide_url || '');
 
-    await executeRunSql(
-      `INSERT INTO committees (
-        id, code, name, abbreviation, description, image_url, language,
-        topic_a, topic_b, topic_c, president_name, president_photo,
-        copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
-        president_welcome, copresident_welcome, study_guide_url,
-        status, sort_order, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        code.trim().toUpperCase(),
-        name.trim(),
-        abbreviation.trim(),
-        description || '',
-        image_url || '',
-        language || 'Español',
-        topic_a.trim(),
-        topic_b || '',
-        topic_c || '',
-        president_name || '',
-        president_photo || '',
-        resolvedCopresidentName,
-        resolvedCopresidentPhoto,
-        resolvedCopresidentName,
-        resolvedCopresidentPhoto,
-        president_welcome || '',
-        copresident_welcome || '',
-        processedStudyGuideUrl,
-        status || 'active',
-        Number(sort_order) || 0,
-        now,
-      ]
-    );
+    try {
+      await executeRunSql(
+        `INSERT INTO committees (
+          id, code, name, abbreviation, description, image_url, language,
+          topic_a, topic_b, topic_c, president_name, president_photo,
+          copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
+          president_welcome, copresident_welcome, study_guide_url,
+          status, sort_order, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          code.trim().toUpperCase(),
+          name.trim(),
+          abbreviation.trim(),
+          description || '',
+          image_url || '',
+          language || 'Español',
+          topic_a.trim(),
+          topic_b || '',
+          topic_c || '',
+          president_name || '',
+          president_photo || '',
+          resolvedCopresidentName,
+          resolvedCopresidentPhoto,
+          resolvedCopresidentName,
+          resolvedCopresidentPhoto,
+          president_welcome || '',
+          copresident_welcome || '',
+          processedStudyGuideUrl,
+          status || 'active',
+          Number(sort_order) || 0,
+          now,
+        ]
+      );
+    } catch (saveErr: any) {
+      console.warn('[Committees POST] Error en inserción, ejecutando auto-reparación de esquema:', saveErr.message);
+      try {
+        await ensureAllTableColumns();
+        await executeRunSql(
+          `INSERT INTO committees (
+            id, code, name, abbreviation, description, image_url, language,
+            topic_a, topic_b, topic_c, president_name, president_photo,
+            copresident_name, copresident_photo, vicepresident_name, vicepresident_photo,
+            president_welcome, copresident_welcome, study_guide_url,
+            status, sort_order, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            code.trim().toUpperCase(),
+            name.trim(),
+            abbreviation.trim(),
+            description || '',
+            image_url || '',
+            language || 'Español',
+            topic_a.trim(),
+            topic_b || '',
+            topic_c || '',
+            president_name || '',
+            president_photo || '',
+            resolvedCopresidentName,
+            resolvedCopresidentPhoto,
+            resolvedCopresidentName,
+            resolvedCopresidentPhoto,
+            president_welcome || '',
+            copresident_welcome || '',
+            processedStudyGuideUrl,
+            status || 'active',
+            Number(sort_order) || 0,
+            now,
+          ]
+        );
+      } catch (retryErr: any) {
+        console.warn('[Committees POST] Reintento fallido, guardando columnas base:', retryErr.message);
+        await executeRunSql(
+          `INSERT INTO committees (
+            id, code, name, abbreviation, description, image_url, language,
+            topic_a, topic_b, topic_c, president_name,
+            status, sort_order, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            code.trim().toUpperCase(),
+            name.trim(),
+            abbreviation.trim(),
+            description || '',
+            image_url || '',
+            language || 'Español',
+            topic_a.trim(),
+            topic_b || '',
+            topic_c || '',
+            president_name || '',
+            status || 'active',
+            Number(sort_order) || 0,
+            now,
+          ]
+        );
+      }
+    }
 
     invalidatePublicDataCache();
     res.status(201).json({ success: true, id, message: 'Comisión creada con éxito.', study_guide_url: processedStudyGuideUrl });
@@ -690,38 +755,101 @@ apiRouter.put('/admin/committees/:id', authMiddleware, async (req, res) => {
       ? saveBase64File(study_guide_url, `guia_${(code || id).toLowerCase().replace(/[^a-z0-9]/g, '_')}`)
       : (study_guide_url || '');
 
-    await executeRunSql(
-      `UPDATE committees SET
-        code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
-        topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?, president_photo = ?,
-        copresident_name = ?, copresident_photo = ?, vicepresident_name = ?, vicepresident_photo = ?,
-        president_welcome = ?, copresident_welcome = ?, study_guide_url = ?,
-        status = ?, sort_order = ?
-       WHERE id = ?`,
-      [
-        (code || '').trim().toUpperCase(),
-        (name || '').trim(),
-        (abbreviation || '').trim(),
-        description || '',
-        image_url || '',
-        language || 'Español',
-        (topic_a || '').trim(),
-        topic_b || '',
-        topic_c || '',
-        president_name || '',
-        president_photo || '',
-        resolvedCopresidentName,
-        resolvedCopresidentPhoto,
-        resolvedCopresidentName,
-        resolvedCopresidentPhoto,
-        president_welcome || '',
-        copresident_welcome || '',
-        processedStudyGuideUrl,
-        status || 'active',
-        Number(sort_order) || 0,
-        id,
-      ]
-    );
+    try {
+      await executeRunSql(
+        `UPDATE committees SET
+          code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
+          topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?, president_photo = ?,
+          copresident_name = ?, copresident_photo = ?, vicepresident_name = ?, vicepresident_photo = ?,
+          president_welcome = ?, copresident_welcome = ?, study_guide_url = ?,
+          status = ?, sort_order = ?
+         WHERE id = ?`,
+        [
+          (code || '').trim().toUpperCase(),
+          (name || '').trim(),
+          (abbreviation || '').trim(),
+          description || '',
+          image_url || '',
+          language || 'Español',
+          (topic_a || '').trim(),
+          topic_b || '',
+          topic_c || '',
+          president_name || '',
+          president_photo || '',
+          resolvedCopresidentName,
+          resolvedCopresidentPhoto,
+          resolvedCopresidentName,
+          resolvedCopresidentPhoto,
+          president_welcome || '',
+          copresident_welcome || '',
+          processedStudyGuideUrl,
+          status || 'active',
+          Number(sort_order) || 0,
+          id,
+        ]
+      );
+    } catch (saveErr: any) {
+      console.warn('[Committees PUT] Error al actualizar, ejecutando auto-reparación de esquema:', saveErr.message);
+      try {
+        await ensureAllTableColumns();
+        await executeRunSql(
+          `UPDATE committees SET
+            code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
+            topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?, president_photo = ?,
+            copresident_name = ?, copresident_photo = ?, vicepresident_name = ?, vicepresident_photo = ?,
+            president_welcome = ?, copresident_welcome = ?, study_guide_url = ?,
+            status = ?, sort_order = ?
+           WHERE id = ?`,
+          [
+            (code || '').trim().toUpperCase(),
+            (name || '').trim(),
+            (abbreviation || '').trim(),
+            description || '',
+            image_url || '',
+            language || 'Español',
+            (topic_a || '').trim(),
+            topic_b || '',
+            topic_c || '',
+            president_name || '',
+            president_photo || '',
+            resolvedCopresidentName,
+            resolvedCopresidentPhoto,
+            resolvedCopresidentName,
+            resolvedCopresidentPhoto,
+            president_welcome || '',
+            copresident_welcome || '',
+            processedStudyGuideUrl,
+            status || 'active',
+            Number(sort_order) || 0,
+            id,
+          ]
+        );
+      } catch (retryErr: any) {
+        console.warn('[Committees PUT] Reintento fallido, aplicando guardado de compatibilidad:', retryErr.message);
+        await executeRunSql(
+          `UPDATE committees SET
+            code = ?, name = ?, abbreviation = ?, description = ?, image_url = ?, language = ?,
+            topic_a = ?, topic_b = ?, topic_c = ?, president_name = ?,
+            status = ?, sort_order = ?
+           WHERE id = ?`,
+          [
+            (code || '').trim().toUpperCase(),
+            (name || '').trim(),
+            (abbreviation || '').trim(),
+            description || '',
+            image_url || '',
+            language || 'Español',
+            (topic_a || '').trim(),
+            topic_b || '',
+            topic_c || '',
+            president_name || '',
+            status || 'active',
+            Number(sort_order) || 0,
+            id,
+          ]
+        );
+      }
+    }
 
     invalidatePublicDataCache();
     res.json({ success: true, message: 'Comisión actualizada con éxito.', study_guide_url: processedStudyGuideUrl });
@@ -2026,6 +2154,22 @@ apiRouter.post('/admin/db-migrate', authMiddleware, adminOnlyMiddleware, async (
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: `Error durante migración: ${err.message}` });
+  }
+});
+
+// Admin-only: Verify and auto-repair missing columns in active database (MySQL / PostgreSQL / SQLite)
+apiRouter.post('/admin/database/repair-schema', authMiddleware, adminOnlyMiddleware, async (req, res) => {
+  try {
+    const result = await ensureAllTableColumns();
+    invalidatePublicDataCache();
+    res.json({
+      success: true,
+      result,
+      status: getDatabaseStatus(),
+    });
+  } catch (err: any) {
+    console.error('Error in /admin/database/repair-schema:', err);
+    res.status(500).json({ success: false, message: `Error durante la reparación del esquema: ${err.message}` });
   }
 });
 

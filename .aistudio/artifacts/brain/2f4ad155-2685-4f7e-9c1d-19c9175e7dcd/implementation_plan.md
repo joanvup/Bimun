@@ -1,112 +1,91 @@
-# Actualización Institucional: Copresidencia, Discursos de Bienvenida y Guías de Estudio en Comisiones
+# Plan de Corrección: Auto-Migración de Columnas y Guardado de Comisiones en MySQL (Producción)
 
-Implementación integral para renombrar "Vicepresidente" a "Copresidente" en todo el portal BIMUN, dotar a cada comisión de discursos individuales de bienvenida para el Presidente y Copresidente con diseño editorial, e incorporar la gestión y descarga de la Guía de Estudio en PDF tanto en las tarjetas del catálogo como en el modal de detalle.
+## 1. Diagnóstico del Problema
 
----
+Al editar una comisión y presionar **Guardar Comisión**, la petición falla con error 500 y no persiste los cambios.
 
-## Decisiones Críticas y Preferencias Confirmadas
-
-> [!IMPORTANT]
-> Con base en la sesión interactiva de clarificación previa, se han adoptado las siguientes directrices aprobadas:
-
-- **Discursos de Bienvenida Separados**: Se habilitan áreas de texto dedicadas e independientes tanto para el **Presidente** como para el **Copresidente** (`president_welcome` y `copresident_welcome`), permitiendo que cada miembro de la mesa directiva exprese su saludo y expectativas pedagógicas.
-- **Carga Dual de la Guía de Estudio en PDF**: En el panel administrativo se implementa una interfaz versátil que permite **subir directamente el archivo PDF** (con validación de tamaño y almacenamiento seguro) o **ingresar una URL externa** (Google Drive, OneDrive o repositorio institucional).
-- **Visibilidad Integral de Descarga**: El botón de descarga y consulta de la Guía de Estudio estará presente tanto de forma ágil en la **tarjeta exterior de cada comisión** como en una sección destacada dentro del **modal de detalle extendido**.
-
----
-
-## 1. Visión General del Producto y Objetivos
-
-1. **Estandarización Terminológica ("Copresidente")**:
-   - Reemplazar en la interfaz pública y administrativa cualquier mención de "Vicepresidente" por "Copresidente" (y "Co-President" en inglés), reflejando la estructura diplomática moderna del modelo de Naciones Unidas BIMUN.
-2. **Discurso de Bienvenida de la Mesa Directiva**:
-   - Brindar a los delegados e instituciones un acercamiento directo a los líderes de cada comité a través de cartas o discursos de bienvenida en formato editorial, con tipografía refinada, comillas estilizadas y lectura cómoda.
-3. **Acceso Inmediato a las Guías de Estudio (Study Guides)**:
-   - Proveer a los delegados inscritos y prospectos el acceso directo al documento central de preparación académica (temas, reglas y dinámicas de debate) sin fricciones.
+### Causa Raíz Confirmada
+1. En producción, la base de datos MySQL fue configurada previamente. El archivo `server/dbManager.ts` ejecutaba únicamente `CREATE TABLE IF NOT EXISTS` durante la inicialización de MySQL.
+2. Como las tablas ya existían en el servidor MySQL remoto, `CREATE TABLE IF NOT EXISTS` no altera la estructura de tablas existentes ni agrega columnas nuevas.
+3. Se agregaron recientemente nuevos campos a la entidad de Comisiones:
+   - `study_guide_url` (guía académica en PDF o enlace)
+   - `copresident_name` y `copresident_photo` (copresidencia académica)
+   - `president_welcome` y `copresident_welcome` (discursos de bienvenida)
+4. Cuando el endpoint `PUT /api/admin/committees/:id` o `POST /api/admin/committees` ejecuta:
+   ```sql
+   UPDATE committees SET ..., copresident_name = ?, copresident_photo = ?, president_welcome = ?, copresident_welcome = ?, study_guide_url = ?, ...
+   ```
+   el motor MySQL en producción rechaza la consulta arrojando:
+   `Error de persistencia en MySQL: Unknown column 'study_guide_url' in 'field list'`
+5. Existen columnas equivalentes que también pudieron quedarse desincronizadas en otras tablas de producción (como `payment_receipt` en `registrations`, `additional_info` en `countries`, etc.).
 
 ---
 
-## 2. Experiencia de Usuario y Diseño Visual (UX & Design)
+## 2. Objetivos y Respuestas del Usuario
 
-Siguiendo la constitución de diseño institucional (*Museum, Editorial & Institutional Design*):
-
-### A. Vista Pública: Tarjeta de Comisión en Cuadrícula (`CommitteesSection.tsx`)
-- **Badge y Nombre del Copresidente**: La mesa directiva muestra claramente "Presidente" y "Copresidente".
-- **Botón de Descarga Rápida de Guía**: En la parte inferior de la tarjeta (junto al botón "Ver detalles"), se añade un botón directo con ícono de documento PDF (`Guía de Estudio` / `Study Guide`) si la comisión dispone de ella.
-
-### B. Vista Pública: Modal Extendido de Comisión
-- **Tarjetas de Liderazgo Rediseñadas**: Retratos en alta resolución con roles institucionales distintivos ("Presidente" y "Copresidente") y función de ampliación fotográfica (lightbox).
-- **Módulo de Discursos de Bienvenida (Editorial Block)**:
-  - Presentación visual estilo carta editorial con tipografía contrastada, comillas estilizadas y espaciado generoso.
-  - Pestañas o bloques armónicos para alternar o visualizar el saludo del Presidente y del Copresidente.
-- **Banner de Descarga de la Guía Académica**:
-  - Caja destacada con estilo sobrio institucional (fondo pizarra suave, borde sutil, botón de descarga con peso visual primario, indicando el formato oficial PDF).
-
-### C. Panel Administrativo (`AdminDashboard.tsx`)
-- **Formulario de Comisión Actualizado**:
-  - Etiquetas renombradas a "Nombre del Copresidente" y "Foto del Copresidente".
-  - Dos nuevas áreas de texto tipo párrafo (`textarea`):
-    - *Discurso de Bienvenida del Presidente* (placeholder orientativo, conteo de caracteres).
-    - *Discurso de Bienvenida del Copresidente* (placeholder orientativo, conteo de caracteres).
-  - Control de carga para la Guía de Estudio (`DocumentUploadField` adaptado): selector entre arrastrar/subir archivo PDF local o pegar un enlace web directo.
+- **Auto-migración automática al conectar**: Cada vez que el servidor se inicia o se conecta a MySQL (o PostgreSQL), verificará automáticamente todas las tablas y añadirá las columnas que falten sin perder ningún dato.
+- **Botón manual en panel**: En la pestaña de configuración de Base de Datos en el panel administrativo, se habilitará un botón "Verificar y Reparar Columnas en Producción" con informe en tiempo real de columnas agregadas/verificadas.
+- **Cobertura total**: Aplicar la verificación y reparación a **todas las tablas** (`committees`, `registrations`, `countries`, `documents`, `gallery`, `about_sections`, `edition_archives`, `news`, `organizing_team`, etc.).
+- **Tolerancia a fallos en caliente**: En los endpoints de guardado (`PUT/POST /api/admin/committees`), si ocurre un error por columna inexistente, el sistema capturará el error, ejecutará la auto-reparación de la tabla en caliente y reintentará la operación automáticamente antes de responder, garantizando que el usuario jamás quede bloqueado.
 
 ---
 
-## 3. Decisiones Técnicas y de Persistencia
+## 3. Arquitectura Técnica de la Solución
 
-1. **Compatibilidad Hacia Atrás en la Base de Datos**:
-   - En las tablas de comisiones (`sqlite`, `postgres`, `mysql`), las columnas existentes `vicepresident_name` y `vicepresident_photo` se conservan internamente y se mapean/aliasen transparentemente a `copresident_name` y `copresident_photo` en la API y frontend para evitar cualquier pérdida o migración riesgosa de datos previos.
-2. **Nuevos Campos de Esquema**:
-   - `president_welcome TEXT`
-   - `copresident_welcome TEXT`
-   - `study_guide_url TEXT`
-3. **Migración Automática y No Destructiva**:
-   - Ejecución de bloques `ALTER TABLE committees ADD COLUMN ...` protegidos con `try/catch` durante el arranque del servidor, asegurando que las bases de datos existentes se actualicen al instante sin reiniciar datos.
+### A. Función Central de Auto-Migración Universal (`server/dbManager.ts`)
+Crear la función `ensureAllTableColumns(pool, type)` que:
+1. Inspecciona la existencia de columnas usando `information_schema.COLUMNS` para MySQL/PostgreSQL y `PRAGMA table_info` para SQLite.
+2. Define un diccionario exhaustivo con todas las columnas esperadas y sus tipos de datos correspondientes para cada tabla.
+3. Identifica de forma segura las columnas faltantes y ejecuta sentencias `ALTER TABLE [tabla] ADD COLUMN [columna] [tipo]` protegidas para evitar conflictos de concurrencia.
+4. Se ejecuta:
+   - Al establecer la conexión inicial con MySQL / PostgreSQL.
+   - Al invocar la sincronización manual desde el panel.
+   - De manera preventiva / en fallback si un query detecta una columna ausente.
 
----
+### B. Endpoint Administrativo de Reparación (`server/api.ts`)
+- `POST /api/admin/database/repair-schema`: Endpoint autenticado que ejecuta la verificación integral de todas las tablas en la base de datos activa y devuelve un reporte detallado:
+  - Tablas analizadas.
+  - Columnas añadidas.
+  - Estado del motor (MySQL, PostgreSQL o SQLite).
 
-## 4. Arquitectura y Flujo de Datos
+### C. Tolerancia a Fallos en Endpoints de Comisiones (`server/api.ts`)
+- En `POST /api/admin/committees` y `PUT /api/admin/committees/:id`:
+  - Si el query falla por `ER_BAD_FIELD_ERROR` / `Unknown column`, se invoca inmediatamente `ensureAllTableColumns()` para crear las columnas faltantes en MySQL y se reintenta la actualización.
+  - Si persiste algún problema imprevisto, se aplica un guardado de compatibilidad degradada (guardando los campos base) para no perder los datos del formulario, registrando el evento.
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        PANEL DE ADMINISTRACIÓN                         │
-│  - Campos: Nombre & Foto Copresidente                                  │
-│  - Textarea: Discurso Presidente & Copresidente                        │
-│  - Control: Carga PDF (Base64) o Enlace URL de Guía de Estudio         │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ PUT/POST /api/admin/committees
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       EXPRESS BACKEND & DATABASE                       │
-│  - Migración: Añadir president_welcome, copresident_welcome,           │
-│    study_guide_url a tabla 'committees'                               │
-│  - Endpoints CRUD actualizados y serialización a JSON público          │
-│  - Soporte de respaldo / snapshot institucional                        │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ GET /api/public/data
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                         PORTAL PÚBLICO BIMUN                           │
-│  - Tarjeta de Comisión: Botón directo de descarga Guía PDF             │
-│  - Modal Detalle:                                                      │
-│      * Mesa Directiva: Presidente & Copresidente (con lightbox)        │
-│      * Discursos de Bienvenida en formato editorial                    │
-│      * Módulo destacado de Descarga de Guía Oficial PDF               │
-└────────────────────────────────────────────────────────────────────────┘
-```
+### D. Interfaz de Usuario en el Panel Admin (`src/components/admin/AdminDashboard.tsx`)
+- En la pestaña de **Base de Datos**:
+  - Incorporar tarjeta interactiva: **Diagnóstico y Reparación de Esquema en Producción**.
+  - Botón: "Verificar y Reparar Columnas".
+  - Muestra alerta de estado con las columnas añadidas o confirmadas (e.g. `study_guide_url`, `copresident_name`, `payment_receipt`).
+- En el modal de Comisiones:
+  - Manejo de errores claro con feedback descriptivo en caso de fallos de red o servidor.
 
 ---
 
-## Plan de Verificación
+## 4. Plan de Ejecución Paso a Paso
 
-1. **Inspección de Esquema y API**:
-   - Comprobar que `/api/public/data` retorne `copresident_name`, `president_welcome`, `copresident_welcome` y `study_guide_url`.
-2. **Prueba en Panel Administrativo**:
-   - Editar una comisión existente, redactar los discursos de bienvenida y cargar/enlazar un PDF de prueba.
-   - Verificar persistencia en base de datos al guardar y recargar la página.
-3. **Prueba en Interfaz Pública**:
-   - Validar que aparezca la palabra "Copresidente" en lugar de "Vicepresidente".
-   - Abrir el modal y corroborar la visualización elegante de los discursos y el visor ampliado de fotos.
-   - Probar la descarga de la Guía de Estudio desde la tarjeta exterior y desde el modal.
-4. **Compilación y Linteo**:
-   - Ejecutar `compile_applet` y `lint_applet` para confirmar cero errores de sintaxis y tipos en TypeScript.
+1. **Actualizar `server/dbManager.ts`**:
+   - Implementar el mapeo exhaustivo de tablas y columnas (con tipos para MySQL, PostgreSQL y SQLite).
+   - Crear `ensureAllTableColumns(activePool, dbType)`.
+   - Conectar `ensureAllTableColumns` dentro de `initMySqlSchema` e `initPostgresSchema` para que ocurra automáticamente al conectar.
+   - Exponer la función para uso externo en endpoints y controladores.
+
+2. **Actualizar `server/api.ts`**:
+   - Agregar ruta `POST /api/admin/database/repair-schema`.
+   - Envolver el guardado y actualización de comisiones con detección y auto-reparación en caliente de columnas faltantes con reintento automático.
+
+3. **Actualizar `src/components/admin/AdminDashboard.tsx`**:
+   - Añadir acción interactiva de "Reparar Esquema de Tablas" con visualización del resultado.
+   - Mejorar mensajes de error al guardar comisiones si la API reporta alguna anomalía.
+
+4. **Compilación y Verificación**:
+   - Ejecutar `compile_applet` para asegurar ausencia de errores de TypeScript y empaquetado Vite.
+   - Probar endpoint y verificar integridad de todas las tablas.
+
+---
+
+## 5. Criterios de Aceptación
+- Al guardar o editar comisiones con guías PDF o discursos de bienvenida en MySQL, la operación responde `200 OK` y persiste todos los campos.
+- El servidor ejecuta automáticamente la adición de columnas si no existen en la base de datos remota sin requerir migraciones manuales por consola.
+- El botón de reparación en el panel permite validar el estado del esquema en cualquier momento con un solo clic.

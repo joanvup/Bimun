@@ -1,6 +1,6 @@
 {
-  "summary": "Plan de implementación para la actualización institucional de Comisiones: cambio de Vicepresidente a Copresidente en todo el portal y panel CMS, incorporación de áreas de texto para los discursos de bienvenida del Presidente y Copresidente, y control de carga dual (archivo PDF directo o enlace URL) de la Guía de Estudio del comité con botones de descarga tanto en la cuadrícula de comisiones como en el modal de detalle.",
-  "updatedAt": "2026-10-14T16:07:40.709046694Z",
+  "summary": "Plan de implementación exhaustivo para resolver el problema de guardado de comisiones y desincronización de esquemas en MySQL en producción:\n1. Auto-migración y verificación proactiva de esquemas (todas las columnas de todas las tablas) al inicializar conexiones MySQL y PostgreSQL.\n2. Endpoint administrativo y botón interactivo en la sección de Base de Datos para verificar y sincronizar/reparar columnas faltantes en cualquier momento.\n3. Mecanismo de tolerancia a fallos en el endpoint de guardado y actualización de comisiones (y demás entidades) que detecta columnas faltantes y las crea en caliente antes de reintentar la operación.\n4. Prevención de bloqueos garantizando compatibilidad total con bases de datos MySQL existentes.",
+  "updatedAt": "2026-10-15T12:32:14.159079563Z",
   "requestFeedback": true,
   "userFacing": true
 }

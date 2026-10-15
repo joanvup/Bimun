@@ -360,12 +360,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showStatus(`Comisión ${isNew ? 'creada' : 'actualizada'} exitosamente.`);
+        if (data.warning) {
+          showStatus(`${data.message || 'Comisión guardada'}. ${data.warning}`);
+        } else {
+          showStatus(`Comisión ${isNew ? 'creada' : 'actualizada'} exitosamente.`);
+        }
         setEditingCommittee(null);
         await loadAllAdminData();
         onDataUpdated();
       } else {
-        showStatus(data.error || data.details || `Error (${res.status}): No se pudo guardar la comisión.`, 'error');
+        showStatus(data.details ? `${data.error || 'Error'}: ${data.details}` : (data.error || `Error (${res.status}): No se pudo guardar la comisión.`), 'error');
       }
     } catch (err: any) {
       showStatus(err.message || 'Error de conexión al guardar la comisión.', 'error');

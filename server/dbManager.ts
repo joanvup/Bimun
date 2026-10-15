@@ -308,6 +308,430 @@ function initSqliteSchemaAndSeed(db: SqlJsDatabase): void {
 }
 
 // -------------------------------------------------------------
+// Canonical Schema & Universal Column Auto-Migration
+// -------------------------------------------------------------
+export interface ColumnDef {
+  name: string;
+  mysqlType: string;
+  postgresType: string;
+  sqliteType: string;
+}
+
+export interface TableDef {
+  tableName: string;
+  columns: ColumnDef[];
+}
+
+export interface SchemaRepairResult {
+  success: boolean;
+  databaseType: 'sqlite' | 'postgres' | 'mysql';
+  checkedTables: number;
+  addedColumns: Array<{ table: string; column: string; type: string }>;
+  verifiedColumns: number;
+  message: string;
+}
+
+export const CANONICAL_TABLE_SCHEMAS: TableDef[] = [
+  {
+    tableName: 'settings',
+    columns: [
+      { name: 'key', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'value', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'updated_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'about_sections',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'section_key', mysqlType: 'VARCHAR(191)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'title', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'subtitle', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'content', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'icon', mysqlType: 'VARCHAR(191)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'is_active', mysqlType: 'INT DEFAULT 1', postgresType: 'INTEGER DEFAULT 1', sqliteType: 'INTEGER DEFAULT 1' },
+    ],
+  },
+  {
+    tableName: 'committees',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'code', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'name', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'abbreviation', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'description', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'image_url', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'language', mysqlType: "VARCHAR(100) DEFAULT 'Español'", postgresType: "VARCHAR(100) DEFAULT 'Español'", sqliteType: "TEXT DEFAULT 'Español'" },
+      { name: 'topic_a', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'topic_b', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'topic_c', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'president_name', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'president_photo', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'copresident_name', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'copresident_photo', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'vicepresident_name', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'vicepresident_photo', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'president_welcome', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'copresident_welcome', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'study_guide_url', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'status', mysqlType: "VARCHAR(50) DEFAULT 'active'", postgresType: "VARCHAR(50) DEFAULT 'active'", sqliteType: "TEXT DEFAULT 'active'" },
+      { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'countries',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'name', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'official_name', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'code', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'flag_emoji', mysqlType: 'VARCHAR(50)', postgresType: 'VARCHAR(50)', sqliteType: 'TEXT' },
+      { name: 'flag_url', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'additional_info', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'status', mysqlType: "VARCHAR(50) DEFAULT 'active'", postgresType: "VARCHAR(50) DEFAULT 'active'", sqliteType: "TEXT DEFAULT 'active'" },
+    ],
+  },
+  {
+    tableName: 'delegations',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'committee_id', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'country_id', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'delegate_name', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'delegate_school', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'delegate_email', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'delegate_phone', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'status', mysqlType: "VARCHAR(50) DEFAULT 'available'", postgresType: "VARCHAR(50) DEFAULT 'available'", sqliteType: "TEXT DEFAULT 'available'" },
+      { name: 'notes', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'schedule',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'day_label', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'date', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'time_start', mysqlType: 'VARCHAR(100) NOT NULL', postgresType: 'VARCHAR(100) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'time_end', mysqlType: 'VARCHAR(100) NOT NULL', postgresType: 'VARCHAR(100) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'activity', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'description', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'location', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'audience', mysqlType: "VARCHAR(255) DEFAULT 'Todos los participantes'", postgresType: "VARCHAR(255) DEFAULT 'Todos los participantes'", sqliteType: "TEXT DEFAULT 'Todos los participantes'" },
+      { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+    ],
+  },
+  {
+    tableName: 'documents',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'title', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'category', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'file_url', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'description', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'file_size', mysqlType: 'VARCHAR(100)', postgresType: 'VARCHAR(100)', sqliteType: 'TEXT' },
+      { name: 'is_featured', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'gallery',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'title', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'caption', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'image_url', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'category', mysqlType: "VARCHAR(191) DEFAULT 'Debate'", postgresType: "VARCHAR(255) DEFAULT 'Debate'", sqliteType: "TEXT DEFAULT 'Debate'" },
+      { name: 'edition', mysqlType: "VARCHAR(191) DEFAULT 'BIMUN XXVI'", postgresType: "VARCHAR(255) DEFAULT 'BIMUN XXVI'", sqliteType: "TEXT DEFAULT 'BIMUN XXVI'" },
+      { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'organizing_team',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'name', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'role', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'category', mysqlType: "VARCHAR(191) DEFAULT ''", postgresType: "VARCHAR(255) DEFAULT ''", sqliteType: "TEXT DEFAULT ''" },
+      { name: 'photo_url', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'bio', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'email', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+    ],
+  },
+  {
+    tableName: 'news',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'title', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'slug', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'excerpt', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'content', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'image_url', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'category', mysqlType: "VARCHAR(191) DEFAULT 'General'", postgresType: "VARCHAR(255) DEFAULT 'General'", sqliteType: "TEXT DEFAULT 'General'" },
+      { name: 'publish_date', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'is_published', mysqlType: 'INT DEFAULT 1', postgresType: 'INTEGER DEFAULT 1', sqliteType: 'INTEGER DEFAULT 1' },
+    ],
+  },
+  {
+    tableName: 'registrations',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'full_name', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'email', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'phone', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'school', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'delegation_type', mysqlType: 'VARCHAR(100) NOT NULL', postgresType: 'VARCHAR(100) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'grade', mysqlType: 'VARCHAR(100)', postgresType: 'VARCHAR(100)', sqliteType: 'TEXT' },
+      { name: 'committee_preference_1', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'committee_preference_2', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'country_preference_1', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'country_preference_2', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'experience', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'dietary_medical', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'emergency_contact', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'status', mysqlType: "VARCHAR(50) DEFAULT 'pending'", postgresType: "VARCHAR(50) DEFAULT 'pending'", sqliteType: "TEXT DEFAULT 'pending'" },
+      { name: 'assigned_committee_id', mysqlType: 'VARCHAR(191)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'assigned_country_id', mysqlType: 'VARCHAR(191)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'notes', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'payment_receipt', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'users',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'username', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'password_hash', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'display_name', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'role', mysqlType: "VARCHAR(100) DEFAULT 'admin'", postgresType: "VARCHAR(100) DEFAULT 'admin'", sqliteType: "TEXT DEFAULT 'admin'" },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+  {
+    tableName: 'edition_archives',
+    columns: [
+      { name: 'id', mysqlType: 'VARCHAR(191) PRIMARY KEY', postgresType: 'VARCHAR(255) PRIMARY KEY', sqliteType: 'TEXT PRIMARY KEY' },
+      { name: 'edition_name', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'edition_year', mysqlType: 'VARCHAR(50) NOT NULL', postgresType: 'VARCHAR(50) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'title', mysqlType: 'VARCHAR(255) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'description', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
+      { name: 'snapshot_json', mysqlType: 'LONGTEXT NOT NULL', postgresType: 'TEXT NOT NULL', sqliteType: 'TEXT NOT NULL' },
+      { name: 'total_delegates', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'total_committees', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'total_photos', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
+      { name: 'created_by', mysqlType: 'VARCHAR(191)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'created_at', mysqlType: 'VARCHAR(191) NOT NULL', postgresType: 'VARCHAR(255) NOT NULL', sqliteType: 'TEXT NOT NULL' },
+    ],
+  },
+];
+
+export async function ensureAllTableColumns(
+  customPool?: any,
+  customType?: 'mysql' | 'postgres' | 'sqlite'
+): Promise<SchemaRepairResult> {
+  const targetType = customType || activeDatabaseType;
+  const addedColumns: Array<{ table: string; column: string; type: string }> = [];
+  let checkedTables = 0;
+  let verifiedColumns = 0;
+
+  try {
+    if (targetType === 'mysql') {
+      const pool: MySqlPool = customPool || mysqlPool;
+      if (!pool) {
+        return {
+          success: false,
+          databaseType: 'mysql',
+          checkedTables: 0,
+          addedColumns: [],
+          verifiedColumns: 0,
+          message: 'No hay conexión activa a MySQL para verificar columnas.',
+        };
+      }
+
+      for (const tableDef of CANONICAL_TABLE_SCHEMAS) {
+        checkedTables++;
+        const tableName = tableDef.tableName;
+
+        // Fetch existing columns in this table
+        let existingCols = new Set<string>();
+        try {
+          const [rows]: any = await pool.query(`SHOW COLUMNS FROM \`${tableName}\`;`);
+          if (Array.isArray(rows)) {
+            for (const r of rows) {
+              const fieldName = r.Field || r.COLUMN_NAME || '';
+              if (fieldName) existingCols.add(fieldName.toLowerCase());
+            }
+          }
+        } catch (tableErr: any) {
+          console.warn(`[Schema Check] Tabla ${tableName} no existe en MySQL, continuando...`);
+          continue;
+        }
+
+        for (const col of tableDef.columns) {
+          verifiedColumns++;
+          if (!existingCols.has(col.name.toLowerCase())) {
+            const cleanType = col.mysqlType.replace(/PRIMARY\s+KEY/gi, '').replace(/UNIQUE/gi, '').trim();
+            console.log(`[Schema Migration] Agregando columna faltante en MySQL: ${tableName}.${col.name} ${cleanType}`);
+            try {
+              await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${col.name}\` ${cleanType};`);
+              addedColumns.push({ table: tableName, column: col.name, type: cleanType });
+            } catch (alterErr: any) {
+              if (!alterErr.message?.includes('Duplicate column') && !alterErr.message?.includes('already exists')) {
+                console.warn(`[Schema Migration] Advertencia al añadir columna ${tableName}.${col.name}:`, alterErr.message);
+              }
+            }
+          }
+        }
+
+        // Specific migrations for committees table: sync copresident and vicepresident
+        if (tableName === 'committees') {
+          try {
+            await pool.query(`UPDATE committees SET copresident_name = vicepresident_name WHERE (copresident_name IS NULL OR copresident_name = '') AND vicepresident_name IS NOT NULL AND vicepresident_name != '';`);
+            await pool.query(`UPDATE committees SET copresident_photo = vicepresident_photo WHERE (copresident_photo IS NULL OR copresident_photo = '') AND vicepresident_photo IS NOT NULL AND vicepresident_photo != '';`);
+            await pool.query(`UPDATE committees SET vicepresident_name = copresident_name WHERE (vicepresident_name IS NULL OR vicepresident_name = '') AND copresident_name IS NOT NULL AND copresident_name != '';`);
+            await pool.query(`UPDATE committees SET vicepresident_photo = copresident_photo WHERE (vicepresident_photo IS NULL OR copresident_photo = '') AND copresident_photo IS NOT NULL AND copresident_photo != '';`);
+          } catch {}
+        }
+      }
+
+      const summaryMsg = addedColumns.length > 0
+        ? `Se agregaron exitosamente ${addedColumns.length} columna(s) faltante(s) en MySQL: ${addedColumns.map(c => `${c.table}.${c.column}`).join(', ')}.`
+        : `Todas las tablas (${checkedTables}) y columnas (${verifiedColumns}) en MySQL están completamente sincronizadas y al día.`;
+
+      console.log(`[DB-Manager] Verificación de esquema MySQL completada. ${summaryMsg}`);
+
+      return {
+        success: true,
+        databaseType: 'mysql',
+        checkedTables,
+        addedColumns,
+        verifiedColumns,
+        message: summaryMsg,
+      };
+    }
+
+    if (targetType === 'postgres') {
+      const pool: Pool = customPool || pgPool;
+      if (!pool) {
+        return {
+          success: false,
+          databaseType: 'postgres',
+          checkedTables: 0,
+          addedColumns: [],
+          verifiedColumns: 0,
+          message: 'No hay conexión activa a PostgreSQL.',
+        };
+      }
+
+      for (const tableDef of CANONICAL_TABLE_SCHEMAS) {
+        checkedTables++;
+        const tableName = tableDef.tableName;
+        let existingCols = new Set<string>();
+
+        try {
+          const res = await pool.query(
+            `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1;`,
+            [tableName]
+          );
+          for (const row of res.rows) {
+            if (row.column_name) existingCols.add(String(row.column_name).toLowerCase());
+          }
+        } catch (tableErr: any) {
+          continue;
+        }
+
+        for (const col of tableDef.columns) {
+          verifiedColumns++;
+          if (!existingCols.has(col.name.toLowerCase())) {
+            const cleanType = col.postgresType.replace(/PRIMARY\s+KEY/gi, '').replace(/UNIQUE/gi, '').trim();
+            console.log(`[Schema Migration] Agregando columna en PostgreSQL: ${tableName}.${col.name}`);
+            try {
+              await pool.query(`ALTER TABLE "${tableName}" ADD COLUMN IF NOT EXISTS "${col.name}" ${cleanType};`);
+              addedColumns.push({ table: tableName, column: col.name, type: cleanType });
+            } catch (err: any) {
+              console.warn(`[Schema Migration] PostgreSQL alter warning:`, err.message);
+            }
+          }
+        }
+      }
+
+      const summaryMsg = addedColumns.length > 0
+        ? `Se agregaron ${addedColumns.length} columna(s) en PostgreSQL: ${addedColumns.map(c => `${c.table}.${c.column}`).join(', ')}.`
+        : `Esquema de PostgreSQL verificado y al día (${checkedTables} tablas).`;
+
+      return {
+        success: true,
+        databaseType: 'postgres',
+        checkedTables,
+        addedColumns,
+        verifiedColumns,
+        message: summaryMsg,
+      };
+    }
+
+    // SQLite
+    const db = await getSqliteDb();
+    for (const tableDef of CANONICAL_TABLE_SCHEMAS) {
+      checkedTables++;
+      const tableName = tableDef.tableName;
+      let existingCols = new Set<string>();
+
+      try {
+        const res = db.exec(`PRAGMA table_info("${tableName}");`);
+        if (res && res[0] && res[0].values) {
+          for (const row of res[0].values) {
+            existingCols.add(String(row[1]).toLowerCase());
+          }
+        }
+      } catch (e) {
+        continue;
+      }
+
+      for (const col of tableDef.columns) {
+        verifiedColumns++;
+        if (!existingCols.has(col.name.toLowerCase())) {
+          const cleanType = col.sqliteType.replace(/PRIMARY\s+KEY/gi, '').replace(/UNIQUE/gi, '').trim();
+          try {
+            db.run(`ALTER TABLE "${tableName}" ADD COLUMN "${col.name}" ${cleanType};`);
+            addedColumns.push({ table: tableName, column: col.name, type: cleanType });
+          } catch (err: any) {}
+        }
+      }
+    }
+    saveSqliteDisk();
+
+    const summaryMsg = addedColumns.length > 0
+      ? `Se agregaron ${addedColumns.length} columna(s) en SQLite: ${addedColumns.map(c => `${c.table}.${c.column}`).join(', ')}.`
+      : `Esquema SQLite verificado (${checkedTables} tablas).`;
+
+    return {
+      success: true,
+      databaseType: 'sqlite',
+      checkedTables,
+      addedColumns,
+      verifiedColumns,
+      message: summaryMsg,
+    };
+  } catch (err: any) {
+    console.error('[Schema Migration Error]', err);
+    return {
+      success: false,
+      databaseType: targetType,
+      checkedTables,
+      addedColumns,
+      verifiedColumns,
+      message: `Error durante la verificación de esquema: ${err.message}`,
+    };
+  }
+}
+
+// -------------------------------------------------------------
 // PostgreSQL & MySQL Schema Initialization
 // -------------------------------------------------------------
 async function initPgSchema(pool: Pool): Promise<void> {
@@ -471,6 +895,7 @@ async function initPgSchema(pool: Pool): Promise<void> {
       created_at VARCHAR(255) NOT NULL
     );
   `);
+  await ensureAllTableColumns(pool, 'postgres');
 }
 
 async function initMySqlSchema(pool: MySqlPool): Promise<void> {
@@ -638,6 +1063,7 @@ async function initMySqlSchema(pool: MySqlPool): Promise<void> {
   for (const sql of tables) {
     await pool.query(sql);
   }
+  await ensureAllTableColumns(pool, 'mysql');
 }
 
 // -------------------------------------------------------------
@@ -755,6 +1181,7 @@ export async function initializeDatabaseManager(): Promise<void> {
       lastErrorMessage = null;
       isInitialized = true;
       console.log('[DB-Manager] Connected to PostgreSQL successfully.');
+      await ensureDefaultAdmin();
       return;
     } catch (err: any) {
       console.error('[DB-Manager] PostgreSQL connection failed, falling back to SQLite:', err.message);
@@ -787,6 +1214,7 @@ export async function initializeDatabaseManager(): Promise<void> {
       lastErrorMessage = null;
       isInitialized = true;
       console.log('[DB-Manager] Connected to MySQL successfully.');
+      await ensureDefaultAdmin();
       return;
     } catch (err: any) {
       console.error('[DB-Manager] MySQL connection failed, falling back to SQLite:', err.message);
@@ -1041,6 +1469,23 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
       return;
     } catch (err: any) {
       console.error('[PostgreSQL Write Error]', err.message);
+      const isMissingCol =
+        String(err?.message || '').toLowerCase().includes('does not exist') ||
+        String(err?.message || '').toLowerCase().includes('no existe la columna');
+
+      if (isMissingCol) {
+        console.warn('[PostgreSQL Auto-Repair] Columna ausente detectada en tiempo de ejecución. Reparando esquema...');
+        try {
+          await ensureAllTableColumns(pgPool, 'postgres');
+          const { sql: retrySql, params: retryParams } = convertSqlForPgAdvanced(sql, params);
+          await pgPool.query(retrySql, retryParams);
+          console.log('[PostgreSQL Auto-Repair] Consulta reintentada y ejecutada exitosamente.');
+          return;
+        } catch (retryErr: any) {
+          console.error('[PostgreSQL Auto-Repair] Fallo en reintento tras autoreparación:', retryErr.message);
+        }
+      }
+
       lastErrorMessage = `PostgreSQL: ${err.message}`;
       if (currentConfig.type === 'postgres') {
         throw new Error(`Error de persistencia en PostgreSQL: ${err.message}`);
@@ -1055,6 +1500,24 @@ export async function executeRunSql(sql: string, params: any[] = []): Promise<vo
       return;
     } catch (err: any) {
       console.error('[MySQL Write Error]', err.message);
+      const isMissingCol =
+        err?.code === 'ER_BAD_FIELD_ERROR' ||
+        err?.errno === 1054 ||
+        String(err?.message || '').toLowerCase().includes('unknown column');
+
+      if (isMissingCol) {
+        console.warn('[MySQL Auto-Repair] Columna ausente detectada en tiempo de ejecución. Reparando esquema...');
+        try {
+          await ensureAllTableColumns(mysqlPool, 'mysql');
+          const { sql: retrySql, params: retryParams } = convertSqlForMySql(sql, params);
+          await mysqlPool.query(retrySql, retryParams);
+          console.log('[MySQL Auto-Repair] Consulta reintentada y ejecutada con éxito tras autoreparación.');
+          return;
+        } catch (retryErr: any) {
+          console.error('[MySQL Auto-Repair] Fallo en reintento tras autoreparación:', retryErr.message);
+        }
+      }
+
       lastErrorMessage = `MySQL: ${err.message}`;
       if (currentConfig.type === 'mysql') {
         throw new Error(`Error de persistencia en MySQL: ${err.message}`);
