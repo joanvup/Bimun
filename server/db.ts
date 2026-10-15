@@ -755,6 +755,7 @@ function seedInitialData(db: Database): void {
     ['logo_url', 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=300&q=80'],
     ['logo_size', '56'],
     ['hero_bg_image', 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1920&q=80'],
+    ['hero_bg_opacity', '95'],
     ['hero_video_url', ''],
     ['contact_email', 'bimun@colegiobilingue.edu.co'],
     ['contact_phone', '+57 (605) 574-2100'],

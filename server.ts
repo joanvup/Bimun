@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/api.ts';
 import { getDb } from './server/db.ts';
@@ -18,9 +19,19 @@ async function startServer() {
   await initializeDatabaseManager();
   await getDb();
 
-  // Middleware
-  app.use(express.json({ limit: '15mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  const docsDir = path.join(uploadsDir, 'documents');
+  if (!fs.existsSync(docsDir)) {
+    fs.mkdirSync(docsDir, { recursive: true });
+  }
+
+  // Middleware - Support up to 50MB for document/guide uploads
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Static files for uploads (PDFs, study guides, documents)
+  app.use('/uploads', express.static(uploadsDir));
 
   // API Routes
   app.use('/api', apiRouter);

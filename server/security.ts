@@ -154,6 +154,7 @@ const PUBLIC_SETTINGS_WHITELIST = new Set([
   'hero_tagline',
   'hero_subtext',
   'hero_bg_image',
+  'hero_bg_opacity',
   'hero_video_url',
   'school_name',
   'institution_name',

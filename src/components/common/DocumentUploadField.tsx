@@ -8,6 +8,8 @@ interface DocumentUploadFieldProps {
   onChange: (fileUrl: string, fileSize?: string) => void;
   helperText?: string;
   maxSizeMb?: number;
+  onProcessingChange?: (isProcessing: boolean) => void;
+  authToken?: string;
 }
 
 export const DocumentUploadField: React.FC<DocumentUploadFieldProps> = ({
@@ -16,16 +18,23 @@ export const DocumentUploadField: React.FC<DocumentUploadFieldProps> = ({
   fileSize,
   onChange,
   helperText = 'Solo se admiten documentos en formato PDF',
-  maxSizeMb = 10,
+  maxSizeMb = 30,
+  onProcessingChange,
+  authToken,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>(
-    fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) ? 'url' : 'upload'
+    fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) && !fileUrl.startsWith(window?.location?.origin || '') ? 'url' : 'upload'
   );
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+
+  const setProcessingState = (processing: boolean) => {
+    setIsProcessing(processing);
+    onProcessingChange?.(processing);
+  };
 
   const handleProcessFile = async (file: File) => {
     // 1. Validate MIME type or file extension
@@ -42,26 +51,59 @@ export const DocumentUploadField: React.FC<DocumentUploadFieldProps> = ({
     }
 
     setErrorMsg(null);
-    setIsProcessing(true);
+    setProcessingState(true);
 
     try {
-      // 3. Convert to Base64 data URL
+      // Read file as base64
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const base64String = reader.result as string;
         const formattedSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+        // If authToken is available, upload directly to server endpoint to get a lightweight URL
+        if (authToken) {
+          try {
+            const uploadRes = await fetch('/api/admin/upload-document', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({
+                fileData: base64String,
+                fileName: file.name,
+              }),
+            });
+
+            if (uploadRes.ok) {
+              const uploadData = await uploadRes.json();
+              if (uploadData.fileUrl) {
+                onChange(uploadData.fileUrl, formattedSize);
+                setFileName(file.name);
+                setProcessingState(false);
+                return;
+              }
+            }
+          } catch (uploadErr) {
+            console.warn('Server upload failed, falling back to data URL:', uploadErr);
+          }
+        }
+
+        // Fallback: use base64 data URL directly
         onChange(base64String, formattedSize);
         setFileName(file.name);
-        setIsProcessing(false);
+        setProcessingState(false);
       };
+
       reader.onerror = () => {
-        setErrorMsg('Error al leer el archivo PDF.');
-        setIsProcessing(false);
+        setErrorMsg('Error al leer el archivo PDF local.');
+        setProcessingState(false);
       };
+
       reader.readAsDataURL(file);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error procesando el documento.');
-      setIsProcessing(false);
+      setProcessingState(false);
     }
   };
 

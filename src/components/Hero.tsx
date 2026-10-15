@@ -118,30 +118,24 @@ export const Hero: React.FC<HeroProps> = ({ settings, committeesCount, countries
             loop
             muted
             playsInline
-            className="w-full h-full object-cover opacity-50 saturate-110 contrast-105 scale-105"
+            className="w-full h-full object-cover saturate-105 contrast-100"
+            style={{ opacity: ((settings.hero_bg_opacity !== undefined && settings.hero_bg_opacity !== null) ? Number(settings.hero_bg_opacity) / 100 : 0.95) }}
             src={settings.hero_video_url}
           />
         ) : (
           <img
             src={settings.hero_bg_image || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=2000&q=85'}
             alt="BIMUN Hero"
-            className="w-full h-full object-cover opacity-45 sm:opacity-55 saturate-115 contrast-105 scale-105 transition-transform duration-10000"
+            className="w-full h-full object-cover object-center saturate-105 contrast-100 transition-opacity duration-500"
+            style={{ opacity: ((settings.hero_bg_opacity !== undefined && settings.hero_bg_opacity !== null) ? Number(settings.hero_bg_opacity) / 100 : 0.95) }}
           />
         )}
 
-        {/* Directional Cinematic Overlays (Keeps left text readable while opening up the right & top lighting) */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/75 to-slate-950/35" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/60" />
+        {/* Directional Vignette: Soft localized gradient on the left keeping text 100% legible, while leaving the photograph with its original colors, sharpness, and depth */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-transparent sm:from-slate-950/75 sm:via-slate-950/25 sm:to-transparent" />
         
-        {/* Atmospheric Blue & Indigo Aura Glows */}
-        <div className="absolute -top-32 left-1/4 w-[600px] h-[500px] bg-blue-600/25 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-1/3 right-10 w-[450px] h-[450px] bg-indigo-500/20 rounded-full blur-[130px] pointer-events-none" />
-        <div className="absolute bottom-10 left-10 w-[400px] h-[350px] bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
-
-        {/* Subtle Geometric Overlay Texture */}
-        <div 
-          className="absolute inset-0 opacity-[0.035] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" 
-        />
+        {/* Soft top gradient for seamless navbar integration and bottom fade to stats bar */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/35" />
       </div>
 
       {/* Main Container */}

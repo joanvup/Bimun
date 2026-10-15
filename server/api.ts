@@ -1,8 +1,43 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
 import { executeQueryAll, executeQueryOne, executeRunSql, initializeDatabaseManager, ensureDefaultAdmin } from './dbManager.ts';
+
+// Helper to save base64 files to disk in /uploads/documents
+export function saveBase64File(base64Data: string, prefix = 'doc'): string {
+  if (!base64Data || typeof base64Data !== 'string') return base64Data || '';
+  if (!base64Data.startsWith('data:')) return base64Data;
+  try {
+    const matches = base64Data.match(/^data:([A-Za-z0-9\-+\/.]+);base64,(.+)$/s);
+    if (!matches || matches.length !== 3) return base64Data;
+    const mime = matches[1].toLowerCase();
+    const data = matches[2];
+    const buffer = Buffer.from(data, 'base64');
+
+    let ext = 'pdf';
+    if (mime.includes('pdf')) ext = 'pdf';
+    else if (mime.includes('png')) ext = 'png';
+    else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
+    else if (mime.includes('webp')) ext = 'webp';
+
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    return `/uploads/documents/${filename}`;
+  } catch (err) {
+    console.error('Error saving base64 file:', err);
+    return base64Data;
+  }
+}
+
 import {
   getDb,
   clearDemoData,
@@ -508,6 +543,29 @@ apiRouter.put('/admin/settings', authMiddleware, async (req, res) => {
   }
 });
 
+// Document Upload Endpoint for PDFs (Committees Study Guides & Documents)
+apiRouter.post('/admin/upload-document', authMiddleware, async (req, res) => {
+  try {
+    const { fileData, fileName } = req.body;
+    if (!fileData) {
+      return res.status(400).json({ error: 'No se recibió ningún archivo PDF para cargar.' });
+    }
+    const cleanPrefix = fileName
+      ? fileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30)
+      : 'guia_academica';
+    const savedUrl = saveBase64File(fileData, cleanPrefix);
+    res.json({
+      success: true,
+      fileUrl: savedUrl,
+      fileName: fileName || 'Documento.pdf',
+      message: 'Archivo PDF cargado y almacenado con éxito.',
+    });
+  } catch (err: any) {
+    console.error('Error uploading document:', err);
+    res.status(500).json({ error: 'Error al procesar el archivo PDF', details: err.message });
+  }
+});
+
 // Committees CRUD
 apiRouter.get('/admin/committees', authMiddleware, async (req, res) => {
   const committees = await executeQueryAll('SELECT * FROM committees ORDER BY sort_order ASC, name ASC;');
@@ -548,6 +606,11 @@ apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
     const resolvedCopresidentName = copresident_name || vicepresident_name || '';
     const resolvedCopresidentPhoto = copresident_photo || vicepresident_photo || '';
 
+    // Convert base64 PDF to filesystem URL if provided as data URI
+    const processedStudyGuideUrl = (study_guide_url && study_guide_url.startsWith('data:'))
+      ? saveBase64File(study_guide_url, `guia_${code.toLowerCase().replace(/[^a-z0-9]/g, '_')}`)
+      : (study_guide_url || '');
+
     await executeRunSql(
       `INSERT INTO committees (
         id, code, name, abbreviation, description, image_url, language,
@@ -575,14 +638,15 @@ apiRouter.post('/admin/committees', authMiddleware, async (req, res) => {
         resolvedCopresidentPhoto,
         president_welcome || '',
         copresident_welcome || '',
-        study_guide_url || '',
+        processedStudyGuideUrl,
         status || 'active',
-        sort_order || 0,
+        Number(sort_order) || 0,
         now,
       ]
     );
 
-    res.status(201).json({ success: true, id, message: 'Comisión creada con éxito.' });
+    invalidatePublicDataCache();
+    res.status(201).json({ success: true, id, message: 'Comisión creada con éxito.', study_guide_url: processedStudyGuideUrl });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al crear comisión', details: err.message });
   }
@@ -614,8 +678,17 @@ apiRouter.put('/admin/committees/:id', authMiddleware, async (req, res) => {
       sort_order,
     } = req.body;
 
+    if (!name || !code || !abbreviation || !topic_a) {
+      return res.status(400).json({ error: 'Nombre, código, sigla y Tema A son obligatorios.' });
+    }
+
     const resolvedCopresidentName = copresident_name || vicepresident_name || '';
     const resolvedCopresidentPhoto = copresident_photo || vicepresident_photo || '';
+
+    // Convert base64 PDF to filesystem URL if provided as data URI to avoid giant payload in DB & frontend
+    const processedStudyGuideUrl = (study_guide_url && study_guide_url.startsWith('data:'))
+      ? saveBase64File(study_guide_url, `guia_${(code || id).toLowerCase().replace(/[^a-z0-9]/g, '_')}`)
+      : (study_guide_url || '');
 
     await executeRunSql(
       `UPDATE committees SET
@@ -626,32 +699,34 @@ apiRouter.put('/admin/committees/:id', authMiddleware, async (req, res) => {
         status = ?, sort_order = ?
        WHERE id = ?`,
       [
-        code,
-        name,
-        abbreviation,
-        description,
-        image_url,
-        language,
-        topic_a,
-        topic_b,
-        topic_c,
-        president_name,
-        president_photo,
+        (code || '').trim().toUpperCase(),
+        (name || '').trim(),
+        (abbreviation || '').trim(),
+        description || '',
+        image_url || '',
+        language || 'Español',
+        (topic_a || '').trim(),
+        topic_b || '',
+        topic_c || '',
+        president_name || '',
+        president_photo || '',
         resolvedCopresidentName,
         resolvedCopresidentPhoto,
         resolvedCopresidentName,
         resolvedCopresidentPhoto,
         president_welcome || '',
         copresident_welcome || '',
-        study_guide_url || '',
-        status,
-        sort_order,
+        processedStudyGuideUrl,
+        status || 'active',
+        Number(sort_order) || 0,
         id,
       ]
     );
 
-    res.json({ success: true, message: 'Comisión actualizada con éxito.' });
+    invalidatePublicDataCache();
+    res.json({ success: true, message: 'Comisión actualizada con éxito.', study_guide_url: processedStudyGuideUrl });
   } catch (err: any) {
+    console.error('Error updating committee:', err);
     res.status(500).json({ error: 'Error al actualizar comisión', details: err.message });
   }
 });
@@ -704,6 +779,7 @@ apiRouter.post('/admin/committees/:id/duplicate', authMiddleware, async (req, re
       ]
     );
 
+    invalidatePublicDataCache();
     res.json({ success: true, id: newId, message: 'Comisión duplicada exitosamente.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al duplicar comisión', details: err.message });
@@ -715,6 +791,7 @@ apiRouter.delete('/admin/committees/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     await executeRunSql('DELETE FROM delegations WHERE committee_id = ?;', [id]);
     await executeRunSql('DELETE FROM committees WHERE id = ?;', [id]);
+    invalidatePublicDataCache();
     res.json({ success: true, message: 'Comisión eliminada con éxito.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar comisión', details: err.message });
@@ -1112,12 +1189,17 @@ apiRouter.post('/admin/documents', authMiddleware, async (req, res) => {
     const { title, category, file_url, description, file_size, is_featured, sort_order } = req.body;
     const id = 'doc_' + Date.now();
     const now = new Date().toISOString();
+    const processedFileUrl = (file_url && file_url.startsWith('data:'))
+      ? saveBase64File(file_url, `doc_${id}`)
+      : (file_url || '#');
+
     await executeRunSql(
       `INSERT INTO documents (id, title, category, file_url, description, file_size, is_featured, sort_order, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, title, category || 'General', file_url || '#', description || '', file_size || '', is_featured ? 1 : 0, sort_order || 0, now]
+      [id, title, category || 'General', processedFileUrl, description || '', file_size || '', is_featured ? 1 : 0, sort_order || 0, now]
     );
-    res.status(201).json({ success: true, id });
+    invalidatePublicDataCache();
+    res.status(201).json({ success: true, id, file_url: processedFileUrl });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al crear documento', details: err.message });
   }
@@ -1127,12 +1209,17 @@ apiRouter.put('/admin/documents/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, category, file_url, description, file_size, is_featured, sort_order } = req.body;
+    const processedFileUrl = (file_url && file_url.startsWith('data:'))
+      ? saveBase64File(file_url, `doc_${id}`)
+      : (file_url || '#');
+
     await executeRunSql(
       `UPDATE documents SET title = ?, category = ?, file_url = ?, description = ?, file_size = ?, is_featured = ?, sort_order = ?
        WHERE id = ?`,
-      [title, category, file_url, description, file_size, is_featured ? 1 : 0, sort_order, id]
+      [title, category, processedFileUrl, description || '', file_size || '', is_featured ? 1 : 0, sort_order, id]
     );
-    res.json({ success: true });
+    invalidatePublicDataCache();
+    res.json({ success: true, file_url: processedFileUrl });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al actualizar documento', details: err.message });
   }
@@ -1142,6 +1229,7 @@ apiRouter.delete('/admin/documents/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     await executeRunSql('DELETE FROM documents WHERE id = ?;', [id]);
+    invalidatePublicDataCache();
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: 'Error al eliminar documento', details: err.message });

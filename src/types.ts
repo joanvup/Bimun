@@ -16,6 +16,7 @@ export interface BIMUNSettings {
   logo_url: string;
   logo_size?: number; // Size in pixels for navbar logo (e.g. 36 to 96, default ~56)
   hero_bg_image: string;
+  hero_bg_opacity?: number; // Opacity percentage (e.g. 50 to 100, default 95)
   hero_video_url?: string;
   contact_email: string;
   contact_phone: string;

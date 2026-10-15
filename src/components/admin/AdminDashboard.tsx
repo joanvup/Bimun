@@ -146,6 +146,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onConfirm: () => Promise<void>;
   } | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [isSavingCommittee, setIsSavingCommittee] = useState(false);
+  const [isProcessingDoc, setIsProcessingDoc] = useState(false);
 
   // Institutional content permissions: Admin, Superadmin, Coordinador, Academico
   const canEditAbout = user.role === 'admin' || user.role === 'superadmin' || user.role === 'coordinador' || user.role === 'academico';
@@ -342,36 +344,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSaveCommittee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCommittee) return;
+    if (isProcessingDoc) {
+      showStatus('El archivo PDF de la guía se está procesando o subiendo. Por favor espera un momento.', 'error');
+      return;
+    }
     const isNew = !editingCommittee.id;
     const url = isNew ? '/api/admin/committees' : `/api/admin/committees/${editingCommittee.id}`;
     const method = isNew ? 'POST' : 'PUT';
 
+    setIsSavingCommittee(true);
     try {
       const res = await authFetch(url, {
         method,
         body: JSON.stringify(editingCommittee),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         showStatus(`Comisión ${isNew ? 'creada' : 'actualizada'} exitosamente.`);
         setEditingCommittee(null);
-        loadAllAdminData();
+        await loadAllAdminData();
         onDataUpdated();
+      } else {
+        showStatus(data.error || data.details || `Error (${res.status}): No se pudo guardar la comisión.`, 'error');
       }
     } catch (err: any) {
-      showStatus(err.message, 'error');
+      showStatus(err.message || 'Error de conexión al guardar la comisión.', 'error');
+    } finally {
+      setIsSavingCommittee(false);
     }
   };
 
   const handleDuplicateCommittee = async (id: string) => {
     try {
       const res = await authFetch(`/api/admin/committees/${id}/duplicate`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         showStatus('Comisión duplicada exitosamente.');
-        loadAllAdminData();
+        await loadAllAdminData();
         onDataUpdated();
+      } else {
+        showStatus(data.error || 'Error al duplicar la comisión', 'error');
       }
     } catch (err: any) {
-      showStatus(err.message, 'error');
+      showStatus(err.message || 'Error al conectar con el servidor', 'error');
     }
   };
 
@@ -416,14 +431,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         method: isNew ? 'POST' : 'PUT',
         body: JSON.stringify(editingCountry),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         showStatus(`País ${isNew ? 'registrado' : 'actualizado'}.`);
         setEditingCountry(null);
-        loadAllAdminData();
+        await loadAllAdminData();
         onDataUpdated();
+      } else {
+        showStatus(data.error || 'Error al guardar el país', 'error');
       }
     } catch (err: any) {
-      showStatus(err.message, 'error');
+      showStatus(err.message || 'Error de conexión al guardar el país', 'error');
     }
   };
 
@@ -468,14 +486,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         method: isNew ? 'POST' : 'PUT',
         body: JSON.stringify(editingDelegation),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         showStatus('Delegación guardada exitosamente.');
         setEditingDelegation(null);
-        loadAllAdminData();
+        await loadAllAdminData();
         onDataUpdated();
+      } else {
+        showStatus(data.error || 'Error al guardar la delegación', 'error');
       }
     } catch (err: any) {
-      showStatus(err.message, 'error');
+      showStatus(err.message || 'Error de conexión al guardar la delegación', 'error');
     }
   };
 
@@ -1428,6 +1449,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         aspectRatio="banner"
                         maxDimensions={{ width: 1920, height: 1080 }}
                       />
+                      <div className="mt-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-200">
+                            Nitidez y Presencia de la Fotografía: <span className="text-amber-400 font-bold">{settings.hero_bg_opacity ?? 95}%</span>
+                          </span>
+                          <span className="text-slate-400 text-[11px]">
+                            {(settings.hero_bg_opacity ?? 95) >= 90 ? '🌟 Colores vivos y máxima nitidez original' : 'Modo atenuado'}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="100"
+                          step="5"
+                          value={settings.hero_bg_opacity ?? 95}
+                          onChange={(e) => setSettings({ ...settings, hero_bg_opacity: Number(e.target.value) })}
+                          className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                        <p className="text-[11px] text-slate-400">
+                          Ajusta qué tan visible y nítida se muestra la fotografía en la portada. Al 95%-100% se aprecian todos los colores y detalles reales sin verse opaca.
+                        </p>
+                      </div>
                     </div>
 
                     <div className="space-y-1 sm:col-span-2">
@@ -3469,9 +3512,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     label="Guía de Estudio del Comité (PDF)"
                     fileUrl={editingCommittee.study_guide_url || ''}
                     fileSize="PDF Oficial"
-                    maxSizeMb={15}
+                    maxSizeMb={30}
+                    authToken={token}
+                    onProcessingChange={setIsProcessingDoc}
                     helperText="Sube el archivo PDF de la guía temática o ingresa un enlace web directo. Estará disponible para descarga por los delegados."
-                    onChange={(url) => setEditingCommittee({ ...editingCommittee, study_guide_url: url })}
+                    onChange={(url) => setEditingCommittee((prev) => prev ? ({ ...prev, study_guide_url: url }) : null)}
                   />
                 </div>
               </div>
@@ -3480,15 +3525,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingCommittee(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300"
+                  disabled={isSavingCommittee}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider"
+                  disabled={isSavingCommittee || isProcessingDoc}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2"
                 >
-                  Guardar Comisión
+                  {isSavingCommittee ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : isProcessingDoc ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Subiendo PDF...</span>
+                    </>
+                  ) : (
+                    <span>Guardar Comisión</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -3893,11 +3952,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 }
                 const isNew = !editingDoc.id;
                 const url = isNew ? '/api/admin/documents' : `/api/admin/documents/${editingDoc.id}`;
-                await authFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(editingDoc) });
-                showStatus('Documento guardado');
-                setEditingDoc(null);
-                loadAllAdminData();
-                onDataUpdated();
+                try {
+                  const res = await authFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(editingDoc) });
+                  const data = await res.json().catch(() => ({}));
+                  if (res.ok) {
+                    showStatus('Documento guardado exitosamente.');
+                    setEditingDoc(null);
+                    await loadAllAdminData();
+                    onDataUpdated();
+                  } else {
+                    showStatus(data.error || 'Error al guardar el documento', 'error');
+                  }
+                } catch (err: any) {
+                  showStatus(err.message || 'Error de conexión al guardar el documento', 'error');
+                }
               }}
               className="space-y-4"
             >
@@ -3907,7 +3975,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="text"
                   required
                   value={editingDoc.title || ''}
-                  onChange={(e) => setEditingDoc({ ...editingDoc, title: e.target.value })}
+                  onChange={(e) => setEditingDoc((prev) => prev ? ({ ...prev, title: e.target.value }) : null)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
                 />
               </div>
@@ -3916,7 +3984,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="text-xs text-slate-400">Categoría</label>
                 <select
                   value={editingDoc.category || (documentCategories[0] || 'Protocolo')}
-                  onChange={(e) => setEditingDoc({ ...editingDoc, category: e.target.value })}
+                  onChange={(e) => setEditingDoc((prev) => prev ? ({ ...prev, category: e.target.value }) : null)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
                 >
                   {documentCategories.map((cat) => (
@@ -3932,7 +4000,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <input
                   type="text"
                   value={editingDoc.description || ''}
-                  onChange={(e) => setEditingDoc({ ...editingDoc, description: e.target.value })}
+                  onChange={(e) => setEditingDoc((prev) => prev ? ({ ...prev, description: e.target.value }) : null)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
                 />
               </div>
@@ -3942,8 +4010,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 label="Cargar Archivo PDF"
                 fileUrl={editingDoc.file_url || ''}
                 fileSize={editingDoc.file_size || ''}
-                maxSizeMb={10}
-                onChange={(url, size) => setEditingDoc({ ...editingDoc, file_url: url, file_size: size })}
+                maxSizeMb={30}
+                authToken={token}
+                onChange={(url, size) => setEditingDoc((prev) => prev ? ({ ...prev, file_url: url, file_size: size }) : null)}
               />
 
               <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
