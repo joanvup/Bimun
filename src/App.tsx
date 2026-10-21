@@ -21,6 +21,7 @@ import { FloatingThemeToggle } from './components/common/FloatingThemeToggle.tsx
 import { ScrollReveal } from './components/common/ScrollReveal.tsx';
 import { IntroSplash } from './components/common/IntroSplash.tsx';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal.tsx';
+import { DelegatePortalModal } from './components/common/DelegatePortalModal.tsx';
 import { PublicDataResponse, AdminUser } from './types.ts';
 
 export default function App() {
@@ -28,6 +29,8 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isDelegatePortalOpen, setIsDelegatePortalOpen] = useState<boolean>(false);
+  const [delegatePortalQuery, setDelegatePortalQuery] = useState<string>('');
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.location.hash === '#cms') {
       return false;
@@ -47,6 +50,11 @@ export default function App() {
   // Pre-fill state for registrations
   const [selectedRegCommittee, setSelectedRegCommittee] = useState<string>('');
   const [selectedRegCountry, setSelectedRegCountry] = useState<string>('');
+
+  const handleOpenDelegatePortal = (query?: string) => {
+    setDelegatePortalQuery(query || '');
+    setIsDelegatePortalOpen(true);
+  };
 
   const fetchPublicData = async () => {
     try {
@@ -322,6 +330,7 @@ export default function App() {
         isAdminLoggedIn={!!(adminToken && adminUser)}
         onGoToCMS={() => setCurrentView('cms')}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenDelegatePortal={() => handleOpenDelegatePortal()}
       />
 
       {/* Hero Header Section */}
@@ -401,6 +410,7 @@ export default function App() {
               countries={countries || []}
               initialCommittee={selectedRegCommittee}
               initialCountry={selectedRegCountry}
+              onOpenDelegatePortal={handleOpenDelegatePortal}
             />
           </ScrollReveal>
         )}
@@ -419,6 +429,15 @@ export default function App() {
         isAdminLoggedIn={!!(adminToken && adminUser)}
         onGoToCMS={() => setCurrentView('cms')}
         onReplayIntro={() => setShowIntro(true)}
+        onOpenDelegatePortal={() => handleOpenDelegatePortal()}
+      />
+
+      {/* Delegate Portal & Digital Carnet Badge Modal */}
+      <DelegatePortalModal
+        isOpen={isDelegatePortalOpen}
+        onClose={() => setIsDelegatePortalOpen(false)}
+        initialQuery={delegatePortalQuery}
+        settings={settings}
       />
 
       {/* Global Intelligent Search Spotlight Modal */}

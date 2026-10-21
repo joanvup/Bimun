@@ -55,6 +55,7 @@ import {
   recordFailedLogin,
   recordSuccessfulLogin,
   registerRateLimiter,
+  delegateLookupRateLimiter,
   filterPublicSettings,
 } from './security.ts';
 
@@ -319,6 +320,114 @@ apiRouter.post('/public/register', registerRateLimiter, async (req, res) => {
   } catch (err: any) {
     console.error('Error submitting registration:', err);
     res.status(500).json({ error: 'Error al procesar la inscripción', details: err.message });
+  }
+});
+
+// Public delegate lookup endpoint for delegate area / carnet digital
+apiRouter.get('/public/delegate-lookup', delegateLookupRateLimiter, async (req, res) => {
+  try {
+    const query = String(req.query.query || '').trim();
+    if (!query || query.length < 3) {
+      return res.status(400).json({ error: 'Por favor ingresa un correo electrónico o código de registro válido (mínimo 3 caracteres).' });
+    }
+
+    const cleanQuery = query.toLowerCase();
+
+    // Search in registrations by email or id
+    const reg = await executeQueryOne<any>(
+      `SELECT id, full_name, email, phone, school, delegation_type, grade,
+              committee_preference_1, committee_preference_2,
+              country_preference_1, country_preference_2,
+              status, assigned_committee_id, assigned_country_id, created_at
+       FROM registrations
+       WHERE LOWER(TRIM(id)) = ? OR LOWER(TRIM(email)) = ?
+       ORDER BY created_at DESC LIMIT 1;`,
+      [cleanQuery, cleanQuery]
+    );
+
+    if (!reg) {
+      return res.status(404).json({
+        found: false,
+        error: 'No se encontró ninguna inscripción con este correo o código. Verifica que los datos coincidan exactamente con tu inscripción.',
+      });
+    }
+
+    let assignedCommittee: any = null;
+    let assignedCountry: any = null;
+
+    let committeeId = reg.assigned_committee_id;
+    let countryId = reg.assigned_country_id;
+
+    // If not directly set in registration, check if there is an active delegation for this delegate
+    if ((!committeeId || !countryId) && (reg.status === 'approved' || reg.status === 'assigned')) {
+      const del = await executeQueryOne<any>(
+        `SELECT committee_id, country_id FROM delegations WHERE LOWER(TRIM(delegate_email)) = ? OR LOWER(TRIM(delegate_name)) = ? LIMIT 1;`,
+        [reg.email.toLowerCase().trim(), reg.full_name.toLowerCase().trim()]
+      );
+      if (del) {
+        committeeId = committeeId || del.committee_id;
+        countryId = countryId || del.country_id;
+      }
+    }
+
+    if (committeeId) {
+      const com = await executeQueryOne<any>(
+        `SELECT id, code, name, abbreviation, language FROM committees WHERE id = ? OR code = ? LIMIT 1;`,
+        [committeeId, committeeId]
+      );
+      if (com) {
+        assignedCommittee = {
+          id: com.id,
+          code: com.code,
+          name: com.name,
+          abbreviation: com.abbreviation,
+          language: com.language,
+        };
+      }
+    }
+
+    if (countryId) {
+      const cntry = await executeQueryOne<any>(
+        `SELECT id, code, name, flag_emoji, flag_url FROM countries WHERE id = ? OR code = ? LIMIT 1;`,
+        [countryId, countryId]
+      );
+      if (cntry) {
+        assignedCountry = {
+          id: cntry.id,
+          code: cntry.code,
+          name: cntry.name,
+          flag_emoji: cntry.flag_emoji,
+          flag_url: cntry.flag_url,
+        };
+      }
+    }
+
+    // Determine eligibility: approved, assigned, or has committee + country assigned
+    const isApprovedOrAssigned = reg.status === 'approved' || reg.status === 'assigned' || Boolean(assignedCommittee && assignedCountry);
+
+    res.json({
+      found: true,
+      registration: {
+        id: reg.id,
+        full_name: reg.full_name,
+        email: reg.email,
+        school: reg.school,
+        grade: reg.grade,
+        delegation_type: reg.delegation_type,
+        status: reg.status,
+        is_eligible_for_badge: isApprovedOrAssigned,
+        created_at: reg.created_at,
+        committee_preference_1: reg.committee_preference_1,
+        committee_preference_2: reg.committee_preference_2,
+        country_preference_1: reg.country_preference_1,
+        country_preference_2: reg.country_preference_2,
+        assigned_committee: assignedCommittee,
+        assigned_country: assignedCountry,
+      },
+    });
+  } catch (err: any) {
+    console.error('Error in delegate lookup:', err);
+    res.status(500).json({ error: 'Error al consultar datos del delegado', details: err.message });
   }
 });
 

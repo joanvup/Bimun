@@ -167,6 +167,7 @@ export interface TeamMember {
   photo_url: string;
   bio: string;
   email: string;
+  welcome_speech?: string;
   sort_order: number;
 }
 
@@ -271,10 +272,41 @@ export interface DatabaseConfig {
   type: DatabaseEngineType;
   host?: string;
   port?: number;
-  database?: string;
   user?: string;
   password?: string;
   ssl?: boolean;
   connectionString?: string;
 }
 
+export interface DelegateLookupResult {
+  found: boolean;
+  registration: {
+    id: string;
+    full_name: string;
+    email: string;
+    school: string;
+    grade?: string;
+    delegation_type: string;
+    status: 'pending' | 'approved' | 'assigned' | 'rejected';
+    is_eligible_for_badge: boolean;
+    created_at: string;
+    committee_preference_1?: string;
+    committee_preference_2?: string;
+    country_preference_1?: string;
+    country_preference_2?: string;
+    assigned_committee?: {
+      id: string;
+      code: string;
+      name: string;
+      abbreviation: string;
+      language?: string;
+    } | null;
+    assigned_country?: {
+      id: string;
+      code: string;
+      name: string;
+      flag_emoji?: string;
+      flag_url?: string;
+    } | null;
+  };
+}

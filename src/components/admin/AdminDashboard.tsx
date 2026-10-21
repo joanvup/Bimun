@@ -4,8 +4,9 @@ import {
   Image, Newspaper, UserCheck, Key, Database, LogOut, Plus, Trash2,
   Edit2, Copy, Check, X, RefreshCw, Download, AlertCircle, Eye, EyeOff,
   Sparkles, RotateCcw, Mail, Lock, Images, Tag, SlidersHorizontal,
-  CheckSquare, Square, Clock, Loader2, Save
+  CheckSquare, Square, Clock, Loader2, Save, FileBadge
 } from 'lucide-react';
+import { generateDelegateCarnetPdf } from '../../utils/carnetPdfGenerator.ts';
 import { ImageUploadField } from '../common/ImageUploadField.tsx';
 import { VideoUploadField } from '../common/VideoUploadField.tsx';
 import { DocumentUploadField } from '../common/DocumentUploadField.tsx';
@@ -2127,6 +2128,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             )}
                           </td>
                           <td className="py-3 px-4 text-right space-x-1.5">
+                            {(r.status === 'approved' || r.status === 'assigned') && (
+                              <button
+                                onClick={() => {
+                                  const com = committees.find(c => c.id === r.assigned_committee_id || c.code === r.assigned_committee_id);
+                                  const cntry = countries.find(c => c.id === r.assigned_country_id || c.code === r.assigned_country_id);
+                                  generateDelegateCarnetPdf({
+                                    delegate: {
+                                      id: r.id,
+                                      full_name: r.full_name,
+                                      email: r.email,
+                                      school: r.school,
+                                      grade: r.grade,
+                                      delegation_type: r.delegation_type,
+                                      status: r.status,
+                                      is_eligible_for_badge: true,
+                                      created_at: r.created_at,
+                                      assigned_committee: com ? { id: com.id, code: com.code, name: com.name, abbreviation: com.abbreviation } : null,
+                                      assigned_country: cntry ? { id: cntry.id, code: cntry.code, name: cntry.name, flag_emoji: cntry.flag_emoji } : null,
+                                    },
+                                    settings: settings as any,
+                                  });
+                                }}
+                                className="p-1 rounded bg-slate-800 hover:bg-amber-950 text-amber-400"
+                                title="Descargar Carnet Oficial PDF"
+                              >
+                                <FileBadge className="w-3.5 h-3.5 inline" />
+                              </button>
+                            )}
                             <button
                               onClick={() => setSelectedReg(r)}
                               className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-blue-400 font-semibold"
@@ -4368,6 +4397,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   helperText="Foto de perfil o retrato institucional"
                   aspectRatio="square"
                   maxDimensions={{ width: 600, height: 600 }}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">Discurso de Bienvenida (Opcional)</label>
+                <textarea
+                  rows={4}
+                  value={editingTeam.welcome_speech || ''}
+                  onChange={(e) => setEditingTeam({ ...editingTeam, welcome_speech: e.target.value })}
+                  placeholder="Escribe el discurso o mensaje de apertura dirigido a los delegados e invitados..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 

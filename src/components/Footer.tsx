@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, Lock, ShieldCheck, Sparkles, Sun, Moon } from 'lucide-react';
+import { Globe, Lock, ShieldCheck, Sparkles, Sun, Moon, FileBadge } from 'lucide-react';
 import { BIMUNSettings } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 import { useTheme } from '../context/ThemeContext.tsx';
@@ -10,6 +10,7 @@ interface FooterProps {
   isAdminLoggedIn: boolean;
   onGoToCMS: () => void;
   onReplayIntro?: () => void;
+  onOpenDelegatePortal?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -18,6 +19,7 @@ export const Footer: React.FC<FooterProps> = ({
   isAdminLoggedIn,
   onGoToCMS,
   onReplayIntro,
+  onOpenDelegatePortal,
 }) => {
   const { language, t } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
@@ -92,6 +94,17 @@ export const Footer: React.FC<FooterProps> = ({
               <li><a href="#cronograma" onClick={(e) => handleScrollTo(e, '#cronograma')} className="hover:text-blue-600 dark:hover:text-white transition-colors">{t.nav.schedule}</a></li>
               <li><a href="#documentos" onClick={(e) => handleScrollTo(e, '#documentos')} className="hover:text-blue-600 dark:hover:text-white transition-colors">{t.nav.documents}</a></li>
               <li><a href="#inscripciones" onClick={(e) => handleScrollTo(e, '#inscripciones')} className="hover:text-blue-600 dark:hover:text-white transition-colors">{t.nav.register}</a></li>
+              {onOpenDelegatePortal && (
+                <li>
+                  <button
+                    onClick={onOpenDelegatePortal}
+                    className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors flex items-center gap-1.5 cursor-pointer text-amber-600 dark:text-amber-400 font-semibold text-left"
+                  >
+                    <FileBadge className="w-3.5 h-3.5" />
+                    <span>{language === 'en' ? 'My Digital Badge' : 'Mi Carnet Digital'}</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 

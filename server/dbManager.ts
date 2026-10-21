@@ -460,6 +460,7 @@ export const CANONICAL_TABLE_SCHEMAS: TableDef[] = [
       { name: 'photo_url', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
       { name: 'bio', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
       { name: 'email', mysqlType: 'VARCHAR(255)', postgresType: 'VARCHAR(255)', sqliteType: 'TEXT' },
+      { name: 'welcome_speech', mysqlType: 'LONGTEXT', postgresType: 'TEXT', sqliteType: 'TEXT' },
       { name: 'sort_order', mysqlType: 'INT DEFAULT 0', postgresType: 'INTEGER DEFAULT 0', sqliteType: 'INTEGER DEFAULT 0' },
     ],
   },
@@ -838,6 +839,7 @@ async function initPgSchema(pool: Pool): Promise<void> {
       photo_url TEXT,
       bio TEXT,
       email VARCHAR(255),
+      welcome_speech TEXT,
       sort_order INT DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS news (
@@ -1002,6 +1004,7 @@ async function initMySqlSchema(pool: MySqlPool): Promise<void> {
       photo_url LONGTEXT,
       bio LONGTEXT,
       email VARCHAR(255),
+      welcome_speech LONGTEXT,
       sort_order INT DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
     `CREATE TABLE IF NOT EXISTS news (

@@ -19,6 +19,7 @@ import {
   Search,
   Sun,
   Moon,
+  FileBadge,
 } from 'lucide-react';
 import { BIMUNSettings } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
@@ -30,6 +31,7 @@ interface NavbarProps {
   isAdminLoggedIn: boolean;
   onGoToCMS: () => void;
   onOpenSearch?: () => void;
+  onOpenDelegatePortal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -38,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isAdminLoggedIn,
   onGoToCMS,
   onOpenSearch,
+  onOpenDelegatePortal,
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
@@ -548,6 +551,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </a>
           )}
 
+          {/* Delegate Portal & Digital Badge Button */}
+          {onOpenDelegatePortal && (
+            <button
+              onClick={onOpenDelegatePortal}
+              className="hidden sm:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 hover:border-amber-500/60 transition-all items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
+              title={language === 'en' ? 'Delegate Area / Digital Badge' : 'Área del Delegado / Carnet Digital'}
+            >
+              <FileBadge className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>{language === 'en' ? 'My Badge' : 'Mi Carnet'}</span>
+            </button>
+          )}
+
           {/* CMS Admin Portal */}
           {isAdminLoggedIn ? (
             <button
@@ -792,6 +807,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <UserCheck className="w-4 h-4" />
                 {t.nav.register}
               </a>
+            )}
+
+            {onOpenDelegatePortal && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenDelegatePortal();
+                }}
+                className="w-full text-center py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <FileBadge className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>{language === 'en' ? 'Delegate Area / My Badge' : 'Área del Delegado / Mi Carnet'}</span>
+              </button>
             )}
 
             {isAdminLoggedIn ? (

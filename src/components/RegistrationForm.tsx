@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Send, CheckCircle2, AlertCircle, User, BookOpen, Shield, CreditCard, AlertTriangle, Phone } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, User, BookOpen, Shield, CreditCard, AlertTriangle, Phone, FileBadge } from 'lucide-react';
 import { Committee, Country } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 import { ImageUploadField } from './common/ImageUploadField.tsx';
@@ -12,6 +12,7 @@ interface RegistrationFormProps {
   countries: Country[];
   initialCommittee?: string;
   initialCountry?: string;
+  onOpenDelegatePortal?: (query?: string) => void;
 }
 
 interface FormErrors {
@@ -31,6 +32,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   countries,
   initialCommittee = '',
   initialCountry = '',
+  onOpenDelegatePortal,
 }) => {
   const { language, t } = useLanguage();
   const isEn = language === 'en';
@@ -385,8 +387,19 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               <span className="font-mono text-lg font-extrabold text-blue-900 dark:text-blue-400">{registeredId}</span>
             </div>
 
-            <div className="pt-4">
+            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+              {onOpenDelegatePortal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDelegatePortal(registeredId || formData.email)}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-amber-600/20"
+                >
+                  <FileBadge className="w-4 h-4" />
+                  <span>Consultar Estado / Ver Carnet</span>
+                </button>
+              )}
               <button
+                type="button"
                 onClick={() => {
                   setSubmitSuccess(false);
                   setFormData({
@@ -410,7 +423,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   setErrors({});
                   setTouched({});
                 }}
-                className="px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
               >
                 {t.registration.new_reg_btn}
               </button>

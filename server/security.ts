@@ -32,6 +32,7 @@ interface RateLimitRecord {
 
 const loginAttempts = new Map<string, RateLimitRecord>();
 const registerAttempts = new Map<string, RateLimitRecord>();
+const lookupAttempts = new Map<string, RateLimitRecord>();
 
 // Cleanup stale rate limit records every 10 minutes
 setInterval(() => {
@@ -46,6 +47,11 @@ setInterval(() => {
   for (const [ip, record] of registerAttempts.entries()) {
     if (now - record.firstAttempt > 60 * 60 * 1000) {
       registerAttempts.delete(ip);
+    }
+  }
+  for (const [ip, record] of lookupAttempts.entries()) {
+    if (now - record.firstAttempt > 15 * 60 * 1000) {
+      lookupAttempts.delete(ip);
     }
   }
 }, 10 * 60 * 1000);
@@ -132,6 +138,36 @@ export function registerRateLimiter(req: Request, res: Response, next: NextFunct
   if (record.count > maxAllowed) {
     return res.status(429).json({
       error: 'Se ha alcanzado el límite de solicitudes de inscripción para tu conexión. Si requieres inscribir más delegaciones de tu colegio, por favor comunícate directamente con la Secretaría General.',
+    });
+  }
+
+  next();
+}
+
+/**
+ * Rate Limiter for Public Delegate Lookup Endpoint:
+ * Allows reasonable queries while protecting against harvesting.
+ */
+export function delegateLookupRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 mins
+  const maxAllowed = 45;
+
+  const record = lookupAttempts.get(ip) || { count: 0, firstAttempt: now };
+
+  if (now - record.firstAttempt > windowMs) {
+    record.count = 1;
+    record.firstAttempt = now;
+  } else {
+    record.count += 1;
+  }
+
+  lookupAttempts.set(ip, record);
+
+  if (record.count > maxAllowed) {
+    return res.status(429).json({
+      error: 'Has alcanzado el límite de consultas para tu conexión. Por favor espera unos minutos antes de intentar de nuevo.',
     });
   }
 

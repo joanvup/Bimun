@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, ShieldCheck, User, ZoomIn, X } from 'lucide-react';
+import { Mail, ShieldCheck, User, ZoomIn, X, Quote } from 'lucide-react';
 import { TeamMember } from '../types.ts';
 import { useLanguage } from '../context/LanguageContext.tsx';
 
@@ -10,15 +10,17 @@ interface TeamSectionProps {
 export const TeamSection: React.FC<TeamSectionProps> = ({ team }) => {
   const { language, t } = useLanguage();
   const [selectedPhotoMember, setSelectedPhotoMember] = useState<TeamMember | null>(null);
+  const [selectedWelcomeMember, setSelectedWelcomeMember] = useState<TeamMember | null>(null);
 
-  // Close modal on Escape key press
+  // Close modals on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelectedPhotoMember(null);
+        setSelectedWelcomeMember(null);
       }
     };
-    if (selectedPhotoMember) {
+    if (selectedPhotoMember || selectedWelcomeMember) {
       window.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
@@ -26,7 +28,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ team }) => {
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
-  }, [selectedPhotoMember]);
+  }, [selectedPhotoMember, selectedWelcomeMember]);
 
   if (!team || team.length === 0) return null;
 
@@ -83,12 +85,11 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ team }) => {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/70 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/40">
+              <div className="space-y-1 w-full">
+                <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-100/70 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/40">
                   {member.role}
                 </span>
                 <h3 className="font-display text-lg font-bold text-slate-900 dark:text-white pt-1">{member.name}</h3>
-                {/* Note: Redundant 'Secretaría' category removed as cargo is already shown */}
               </div>
 
               {member.bio && (
@@ -98,11 +99,23 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ team }) => {
               {member.email && (
                 <a
                   href={`mailto:${member.email}`}
-                  className="pt-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+                  className="pt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Mail className="w-3.5 h-3.5" />
                   <span className="truncate max-w-[200px]">{member.email}</span>
                 </a>
+              )}
+
+              {/* Welcome Speech Button if available */}
+              {member.welcome_speech && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedWelcomeMember(member)}
+                  className="w-full mt-2 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+                >
+                  <Quote className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>{language === 'en' ? 'Welcome Address' : 'Discurso de Bienvenida'}</span>
+                </button>
               )}
             </div>
           ))}
@@ -169,6 +182,78 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ team }) => {
                   </a>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WELCOME SPEECH MODAL */}
+      {selectedWelcomeMember && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto"
+          onClick={() => setSelectedWelcomeMember(null)}
+        >
+          <div
+            className="relative max-w-2xl w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-6 sm:p-8 flex flex-col space-y-6 animate-in zoom-in-95 duration-200 my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with Close Button */}
+            <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-blue-500/50 bg-slate-100 dark:bg-slate-800 shrink-0 shadow-md">
+                  {selectedWelcomeMember.photo_url ? (
+                    <img
+                      src={selectedWelcomeMember.photo_url}
+                      alt={selectedWelcomeMember.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400">
+                      <User className="w-7 h-7" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block">
+                    {selectedWelcomeMember.role}
+                  </span>
+                  <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+                    {selectedWelcomeMember.name}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedWelcomeMember(null)}
+                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                title={language === 'en' ? 'Close' : 'Cerrar'}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Speech Body */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Quote className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {language === 'en' ? 'Official Welcome Address' : 'Discurso Oficial de Bienvenida'}
+                </h4>
+              </div>
+              <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed italic shadow-inner">
+                {selectedWelcomeMember.welcome_speech}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+              <button
+                onClick={() => setSelectedWelcomeMember(null)}
+                className="px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                {language === 'en' ? 'Close' : 'Cerrar'}
+              </button>
             </div>
           </div>
         </div>

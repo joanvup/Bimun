@@ -207,6 +207,7 @@ function initSchemaAndSeed(db: Database): void {
       photo_url TEXT,
       bio TEXT,
       email TEXT,
+      welcome_speech TEXT,
       sort_order INTEGER DEFAULT 0
     );
   `);
