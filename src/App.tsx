@@ -30,6 +30,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isDelegatePortalOpen, setIsDelegatePortalOpen] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [delegatePortalQuery, setDelegatePortalQuery] = useState<string>('');
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.location.hash === '#cms') {
@@ -331,6 +332,8 @@ export default function App() {
         onGoToCMS={() => setCurrentView('cms')}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenDelegatePortal={() => handleOpenDelegatePortal()}
+        mobileMenuOpen={isMobileMenuOpen}
+        onToggleMobileMenu={(open) => setIsMobileMenuOpen(open !== undefined ? open : !isMobileMenuOpen)}
       />
 
       {/* Hero Header Section */}

@@ -58,7 +58,7 @@ export const ScrollToTopButton: React.FC = () => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.7, y: 20 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed bottom-6 right-6 z-40 group"
+          className="fixed bottom-6 right-6 z-40 group hidden sm:block"
         >
           <button
             id="scroll-to-top-btn"

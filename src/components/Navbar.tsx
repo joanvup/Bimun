@@ -32,6 +32,8 @@ interface NavbarProps {
   onGoToCMS: () => void;
   onOpenSearch?: () => void;
   onOpenDelegatePortal?: () => void;
+  mobileMenuOpen?: boolean;
+  onToggleMobileMenu?: (open?: boolean) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -41,18 +43,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   onGoToCMS,
   onOpenSearch,
   onOpenDelegatePortal,
+  mobileMenuOpen: controlledMobileMenuOpen,
+  onToggleMobileMenu,
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
+
+  const isMenuControlled = controlledMobileMenuOpen !== undefined;
+  const mobileMenuOpen = isMenuControlled ? controlledMobileMenuOpen : internalMobileMenuOpen;
+
+  const setMobileMenuOpen = (open: boolean) => {
+    if (onToggleMobileMenu) {
+      onToggleMobileMenu(open);
+    }
+    if (!isMenuControlled) {
+      setInternalMobileMenuOpen(open);
+    }
+  };
 
   // Desktop dropdown states
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Mobile accordion state
-  const [expandedMobileGroup, setExpandedMobileGroup] = useState<string | null>(null);
 
   // Dynamic logo dimension calculation with safe constraints (range: 36px to 96px, default: 56px)
   const rawLogoSize = Number(settings.logo_size);
@@ -193,9 +207,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     }, 200);
   };
 
-  const toggleMobileGroup = (groupKey: string) => {
-    setExpandedMobileGroup(expandedMobileGroup === groupKey ? null : groupKey);
-  };
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     setActiveDropdown(null);
@@ -240,8 +251,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         id="main-navbar"
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
           isScrolled
-            ? 'bg-white/95 dark:bg-slate-950/95 backdrop-blur-md shadow-md dark:shadow-xl py-2.5 border-b border-slate-200/90 dark:border-slate-800/90'
-            : 'bg-gradient-to-b from-white/95 via-white/80 to-transparent dark:from-slate-950/95 dark:via-slate-950/75 dark:to-transparent py-4'
+            ? 'bg-[#0c1f38]/98 backdrop-blur-md shadow-xl py-2.5 border-b border-amber-400/25'
+            : 'bg-gradient-to-b from-[#0c1f38] via-[#0c1f38]/95 to-[#0c1f38]/90 py-3 sm:py-3.5 border-b border-amber-400/20'
         }`}
       >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
@@ -278,11 +289,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
           <div className="flex flex-col justify-center">
-            <span className="font-display tracking-wider text-xl sm:text-2xl font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-200 transition-colors leading-tight">
-              {settings.bimun_name || 'BIMUN XXVII'}
-            </span>
-            <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 font-medium tracking-tight truncate max-w-[200px] sm:max-w-sm mt-0.5">
+            <span className="font-serif tracking-normal text-xs sm:text-sm lg:text-base font-bold text-white uppercase leading-tight line-clamp-2 max-w-[170px] sm:max-w-xs md:max-w-md">
               {settings.institution_name || 'Fundación Colegio Bilingüe de Valledupar'}
+            </span>
+            <span className="text-[10px] sm:text-xs text-amber-400 font-serif font-semibold tracking-wider uppercase mt-0.5">
+              {settings.bimun_name || 'BIMUN XXVII'} • FOUNDED 1980
             </span>
           </div>
         </a>
@@ -470,69 +481,67 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </nav>
 
-        {/* Right Action Controls: Language Selector + Registration Button + CMS */}
+        {/* Right Action Controls: Desktop + Mobile */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Intelligent Quick Search Trigger Button (Desktop & Tablet) */}
+          {/* Desktop Search Trigger */}
           {onOpenSearch && (
             <button
               onClick={onOpenSearch}
-              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all shadow-sm text-xs group cursor-pointer"
+              className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-white transition-all shadow-sm text-xs group cursor-pointer"
               title={language === 'en' ? 'Search (Ctrl+K / ⌘K)' : 'Buscar comisiones, documentos, noticias... (Ctrl+K / ⌘K)'}
             >
-              <Search className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline text-slate-700 dark:text-slate-300 font-medium">
+              <Search className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span className="text-slate-200 font-medium">
                 {language === 'en' ? 'Quick Search...' : 'Buscar...'}
               </span>
-              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+              <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
                 ⌘K
               </kbd>
             </button>
           )}
 
-          {/* Mobile Quick Search Button */}
-          {onOpenSearch && (
-            <button
-              onClick={onOpenSearch}
-              className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 transition-colors cursor-pointer"
-              title={language === 'en' ? 'Search' : 'Buscar'}
-              aria-label="Buscar en la plataforma"
-            >
-              <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </button>
-          )}
-
-          {/* Functional Language Switcher (Español / English) */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl p-0.5 shadow-sm">
+          {/* Desktop Dual Language Switcher */}
+          <div className="hidden lg:flex items-center bg-slate-900/90 border border-slate-700 rounded-xl p-0.5 shadow-sm">
             <button
               onClick={() => setLanguage('es')}
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 language === 'es'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white'
               }`}
               title="Cambiar a Español"
             >
-              <span className="text-xs">🇪🇸</span>
+              <span className="text-xs">🇨🇴</span>
               <span className="tracking-wider font-mono">ES</span>
             </button>
             <button
               onClick={() => setLanguage('en')}
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 language === 'en'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white'
               }`}
               title="Switch to English"
             >
-              <span className="text-xs">🇬🇧</span>
+              <span className="text-xs">🇺🇸</span>
               <span className="tracking-wider font-mono">EN</span>
             </button>
           </div>
 
-          {/* Theme Toggle Button (Light / Dark) */}
+          {/* Mobile Language Switcher Pill (matches image_7bdc2661.png) */}
+          <button
+            onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-600/80 text-white text-xs font-semibold tracking-wider transition-colors cursor-pointer"
+            title={language === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+          >
+            <span className="text-sm">{language === 'es' ? '🇺🇸' : '🇨🇴'}</span>
+            <span className="font-mono font-bold">{language === 'es' ? 'EN' : 'ES'}</span>
+          </button>
+
+          {/* Desktop Theme Toggle Button */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-amber-400/50 text-slate-700 dark:text-slate-300 hover:text-amber-500 dark:hover:text-amber-300 transition-all shadow-sm cursor-pointer"
+            className="hidden lg:flex p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-amber-300 transition-all shadow-sm cursor-pointer"
             title={
               isDark
                 ? language === 'en'
@@ -547,373 +556,285 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isDark ? (
               <Sun className="w-4 h-4 text-amber-400 animate-in spin-in-90 duration-300" />
             ) : (
-              <Moon className="w-4 h-4 text-indigo-600 animate-in spin-in-90 duration-300" />
+              <Moon className="w-4 h-4 text-indigo-400 animate-in spin-in-90 duration-300" />
             )}
           </button>
 
-          {/* Registration Button */}
+          {/* Desktop Registration Button */}
           {isSectionActive('inscripciones', 'registrations') && (
             <a
               href="#inscripciones"
               onClick={(e) => handleNavClick(e, '#inscripciones')}
-              className="hidden sm:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all hover:shadow-blue-600/50 items-center gap-1.5"
+              className="hidden lg:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all hover:shadow-blue-600/50 items-center gap-1.5"
             >
               <UserCheck className="w-3.5 h-3.5" />
               <span>{t.nav.register}</span>
             </a>
           )}
 
-          {/* Delegate Portal & Digital Badge Button */}
+          {/* Desktop Delegate Portal & Digital Badge Button */}
           {onOpenDelegatePortal && (
             <button
               onClick={onOpenDelegatePortal}
-              className="hidden sm:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 hover:border-amber-500/60 transition-all items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
+              className="hidden lg:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 hover:border-amber-500/70 transition-all items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
               title={language === 'en' ? 'Delegate Area / Digital Badge' : 'Área del Delegado / Carnet Digital'}
             >
-              <FileBadge className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <FileBadge className="w-3.5 h-3.5 text-amber-400" />
               <span>{language === 'en' ? 'My Badge' : 'Mi Carnet'}</span>
             </button>
           )}
 
-          {/* CMS Admin Portal */}
+          {/* Desktop CMS Admin Portal */}
           {isAdminLoggedIn ? (
             <button
               onClick={onGoToCMS}
-              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="hidden lg:flex text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 items-center gap-1.5 transition-colors cursor-pointer"
               title="Ir al Panel Administrativo"
             >
-              <Shield className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-              <span className="hidden md:inline">{t.nav.cms_panel}</span>
-            </button>
-          ) : (
-            <button
-              onClick={onOpenCMS}
-              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Acceso Administrativo Secretaría"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">{t.nav.cms}</span>
-            </button>
-          )}
-
-          {/* Mobile Menu Toggle Button (44px min touch target) */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 cursor-pointer"
-            aria-label="Abrir menú de navegación"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Sliding Drawer & Backdrop Overlay */}
-      {mobileMenuOpen && (
-        <div
-          onClick={() => setMobileMenuOpen(false)}
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 transition-opacity animate-in fade-in"
-          aria-hidden="true"
-        />
-      )}
-
-      <div
-        className={`fixed inset-y-0 right-0 w-full max-w-xs sm:max-w-sm bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-out transform ${
-          mobileMenuOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
-        }`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Menú de navegación"
-      >
-        {/* Drawer Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/80">
-          <div className="flex items-center gap-2.5">
-            {settings.logo_url ? (
-              <img
-                src={settings.logo_url}
-                alt="BIMUN"
-                className="w-8 h-8 rounded-lg object-contain"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
-                BM
-              </div>
-            )}
-            <div>
-              <p className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
-                {settings.bimun_name || 'BIMUN XXVII'}
-              </p>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                {settings.institution_name || 'Colegio Bilingüe'}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            aria-label="Cerrar menú"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Drawer Body (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-          {/* Quick Action: Delegate Badge Portal */}
-          {onOpenDelegatePortal && (
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenDelegatePortal();
-              }}
-              className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-600/15 border border-amber-500/40 hover:border-amber-500 text-left transition-all shadow-sm flex items-center justify-between group cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0">
-                  <FileBadge className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
-                    {language === 'en' ? 'Official Credential' : 'Área del Delegado'}
-                  </span>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white mt-0.5">
-                    {language === 'en' ? 'Download Digital Badge (PDF)' : 'Descargar Carnet Oficial PDF'}
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition-transform">
-                →
-              </span>
-            </button>
-          )}
-
-          {/* Quick Search Bar */}
-          {onOpenSearch && (
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenSearch();
-              }}
-              className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>{language === 'en' ? 'Search committees, guides...' : 'Buscar comisiones, guías...'}</span>
-              </div>
-              <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-900 text-[10px] font-mono text-slate-500 border border-slate-200 dark:border-slate-700">
-                ⌘K
-              </kbd>
-            </button>
-          )}
-
-          {/* Quick Controls: Language & Theme */}
-          <div className="grid grid-cols-2 gap-2 pt-0.5">
-            {/* Language switch */}
-            <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
-              <button
-                onClick={() => setLanguage('es')}
-                className={`flex-1 min-h-[38px] text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                  language === 'es'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                🇪🇸 Español
-              </button>
-              <button
-                onClick={() => setLanguage('en')}
-                className={`flex-1 min-h-[38px] text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
-                  language === 'en'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                🇬🇧 English
-              </button>
-            </div>
-
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              className="min-h-[44px] flex items-center justify-center gap-2 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
-              aria-label="Alternar tema claro y oscuro"
-            >
-              {isDark ? (
-                <>
-                  <Sun className="w-4 h-4 text-amber-500" />
-                  <span className="text-[11px]">Modo Claro</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-4 h-4 text-indigo-600" />
-                  <span className="text-[11px]">Modo Oscuro</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Direct Home Link */}
-          <a
-            href="#inicio"
-            onClick={(e) => handleNavClick(e, '#inicio')}
-            className="flex items-center gap-2 min-h-[44px] px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/70 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-white transition-colors"
-          >
-            <span>{t.nav.home}</span>
-          </a>
-
-          {/* Group 1: Institucional Accordion */}
-          {institutionalItems.length > 0 && (
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 overflow-hidden">
-              <button
-                onClick={() => toggleMobileGroup('institutional')}
-                className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Landmark className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>{t.nav.institutional}</span>
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-200 text-slate-400 ${
-                    expandedMobileGroup === 'institutional' ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-                  }`}
-                />
-              </button>
-              {expandedMobileGroup === 'institutional' && (
-                <div className="p-2 pt-0 space-y-1 border-t border-slate-200/60 dark:border-slate-800/50 bg-white/60 dark:bg-slate-950/40">
-                  {institutionalItems.map((item) => (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 p-2.5 min-h-[44px] rounded-lg text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      {item.icon}
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{item.label}</span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Group 2: Académico Accordion */}
-          {academicItems.length > 0 && (
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 overflow-hidden">
-              <button
-                onClick={() => toggleMobileGroup('academic')}
-                className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>{t.nav.academic}</span>
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-200 text-slate-400 ${
-                    expandedMobileGroup === 'academic' ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-                  }`}
-                />
-              </button>
-              {expandedMobileGroup === 'academic' && (
-                <div className="p-2 pt-0 space-y-1 border-t border-slate-200/60 dark:border-slate-800/50 bg-white/60 dark:bg-slate-950/40">
-                  {academicItems.map((item) => (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 p-2.5 min-h-[44px] rounded-lg text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      {item.icon}
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{item.label}</span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Group 3: Evento Accordion */}
-          {eventItems.length > 0 && (
-            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 overflow-hidden">
-              <button
-                onClick={() => toggleMobileGroup('event')}
-                className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-                  <span>{t.nav.event}</span>
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-200 text-slate-400 ${
-                    expandedMobileGroup === 'event' ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-                  }`}
-                />
-              </button>
-              {expandedMobileGroup === 'event' && (
-                <div className="p-2 pt-0 space-y-1 border-t border-slate-200/60 dark:border-slate-800/50 bg-white/60 dark:bg-slate-950/40">
-                  {eventItems.map((item) => (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 p-2.5 min-h-[44px] rounded-lg text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      {item.icon}
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{item.label}</span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Drawer Footer Actions (Pinned at bottom of drawer) */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/90 space-y-2.5">
-          {isSectionActive('inscripciones', 'registrations') && (
-            <a
-              href="#inscripciones"
-              onClick={(e) => handleNavClick(e, '#inscripciones')}
-              className="w-full min-h-[44px] py-3 rounded-xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>{t.nav.register}</span>
-            </a>
-          )}
-
-          {isAdminLoggedIn ? (
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onGoToCMS();
-              }}
-              className="w-full min-h-[44px] py-2.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Shield className="w-4 h-4" />
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
               <span>{t.nav.cms_panel}</span>
             </button>
           ) : (
             <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenCMS();
-              }}
-              className="w-full min-h-[44px] py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              onClick={onOpenCMS}
+              className="hidden lg:flex text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 items-center gap-1.5 transition-colors cursor-pointer"
+              title="Acceso Administrativo Secretaría"
             >
-              <Lock className="w-4 h-4" />
+              <Lock className="w-3.5 h-3.5 text-slate-400" />
               <span>{t.nav.cms}</span>
             </button>
           )}
+
+          {/* Mobile Menu Toggle Button (matches image_7bdc2661.png & image_5a2d4d6d.png) */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden min-h-[44px] min-w-[44px] p-2.5 rounded-xl border-2 border-amber-400 bg-[#0e213d] hover:bg-[#152e50] text-white flex items-center justify-center shadow-md transition-all active:scale-95 cursor-pointer"
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          >
+            {mobileMenuOpen ? (
+              <X className="w-5 h-5 text-white stroke-[2.5]" />
+            ) : (
+              <Menu className="w-5 h-5 text-white stroke-[2.5]" />
+            )}
+          </button>
         </div>
       </div>
-      </header>
+
+      {/* Mobile Full-Width Accordion Dropdown Panel (matches image_5a2d4d6d.png) */}
+      {mobileMenuOpen && (
+        <div
+          className="lg:hidden absolute top-full left-0 right-0 bg-[#0c1f38] text-white shadow-2xl border-t border-amber-400/30 border-b-2 border-amber-400/40 z-50 px-5 sm:px-8 py-6 transition-all duration-300 ease-out animate-in slide-in-from-top-2"
+          role="dialog"
+          aria-label="Menú desplegable móvil"
+        >
+          <div className="flex items-start justify-between gap-4 max-w-lg mx-auto">
+            {/* Left Column: Vertical Links in classic serif typography */}
+            <nav className="flex-1 space-y-1">
+              {/* Inicio (Golden / Active highlight) */}
+              <a
+                href="#inicio"
+                onClick={(e) => handleNavClick(e, '#inicio')}
+                className="block py-2 text-lg sm:text-xl font-serif font-bold text-amber-400 hover:text-amber-300 transition-colors"
+              >
+                {t.nav.home}
+              </a>
+
+              {/* Nosotros */}
+              {isSectionActive('nosotros', 'about') && (
+                <a
+                  href="#nosotros"
+                  onClick={(e) => handleNavClick(e, '#nosotros')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.about}
+                </a>
+              )}
+
+              {/* Comisiones */}
+              {isSectionActive('comisiones', 'committees') && (
+                <a
+                  href="#comisiones"
+                  onClick={(e) => handleNavClick(e, '#comisiones')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.committees}
+                </a>
+              )}
+
+              {/* Delegaciones / Matriz */}
+              {isSectionActive('delegaciones', 'delegations') && (
+                <a
+                  href="#delegaciones"
+                  onClick={(e) => handleNavClick(e, '#delegaciones')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.delegations}
+                </a>
+              )}
+
+              {/* Cronograma */}
+              {isSectionActive('cronograma', 'schedule') && (
+                <a
+                  href="#cronograma"
+                  onClick={(e) => handleNavClick(e, '#cronograma')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.schedule}
+                </a>
+              )}
+
+              {/* Documentos */}
+              {isSectionActive('documentos', 'documents') && (
+                <a
+                  href="#documentos"
+                  onClick={(e) => handleNavClick(e, '#documentos')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.documents}
+                </a>
+              )}
+
+              {/* Inscripciones */}
+              {isSectionActive('inscripciones', 'registrations') && (
+                <a
+                  href="#inscripciones"
+                  onClick={(e) => handleNavClick(e, '#inscripciones')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.register}
+                </a>
+              )}
+
+              {/* Contacto */}
+              {isSectionActive('contacto', 'contact') && (
+                <a
+                  href="#contacto"
+                  onClick={(e) => handleNavClick(e, '#contacto')}
+                  className="block py-2 text-lg sm:text-xl font-serif font-medium text-white hover:text-amber-300 transition-colors"
+                >
+                  {t.nav.contact}
+                </a>
+              )}
+            </nav>
+
+            {/* Right Column: 3 Circular Portal Shortcut Badges */}
+            <div className="w-24 sm:w-28 flex flex-col items-center justify-start space-y-4 pt-1 shrink-0">
+              {/* 1. Mi Carnet (Badge Credential) */}
+              {onOpenDelegatePortal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenDelegatePortal();
+                  }}
+                  className="group flex flex-col items-center cursor-pointer"
+                  title={language === 'en' ? 'My Official Badge' : 'Mi Carnet Oficial'}
+                >
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 border-2 border-amber-300 text-white flex items-center justify-center shadow-lg shadow-amber-950/50 group-hover:scale-105 active:scale-95 transition-transform">
+                    <FileBadge className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="text-[11px] font-bold text-amber-300 group-hover:text-amber-200 mt-1.5 text-center leading-tight">
+                    {language === 'en' ? 'My Badge' : 'Mi Carnet'}
+                  </span>
+                </button>
+              )}
+
+              {/* 2. Guías y Temarios */}
+              <a
+                href="#documentos"
+                onClick={(e) => handleNavClick(e, '#documentos')}
+                className="group flex flex-col items-center cursor-pointer"
+                title={language === 'en' ? 'Academic Guides' : 'Guías Académicas'}
+              >
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 border-2 border-sky-300 text-white flex items-center justify-center shadow-lg shadow-blue-950/50 group-hover:scale-105 active:scale-95 transition-transform">
+                  <BookOpen className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-[11px] font-bold text-sky-200 group-hover:text-white mt-1.5 text-center leading-tight">
+                  {language === 'en' ? 'Guides' : 'Guías'}
+                </span>
+              </a>
+
+              {/* 3. Buscador */}
+              {onOpenSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenSearch();
+                  }}
+                  className="group flex flex-col items-center cursor-pointer"
+                  title={language === 'en' ? 'Quick Search' : 'Buscador'}
+                >
+                  <div className="w-14 h-14 rounded-full bg-white border-2 border-slate-200 text-slate-800 flex items-center justify-center shadow-lg shadow-slate-950/40 group-hover:scale-105 active:scale-95 transition-transform">
+                    <Search className="w-6 h-6 text-blue-950" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-200 group-hover:text-white mt-1.5 text-center leading-tight">
+                    {language === 'en' ? 'Search' : 'Buscador'}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom utility footer bar inside dropdown */}
+          <div className="mt-6 pt-4 border-t border-amber-400/20 flex items-center justify-between text-xs text-slate-300 max-w-lg mx-auto">
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white transition-colors cursor-pointer"
+            >
+              {isDark ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span>Modo Claro</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-blue-300" />
+                  <span>Modo Oscuro</span>
+                </>
+              )}
+            </button>
+
+            {/* Admin CMS Access */}
+            {isAdminLoggedIn ? (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onGoToCMS();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t.nav.cms_panel}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenCMS();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer text-xs"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span>{t.nav.cms}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </header>
+
+    {/* Backdrop Overlay when mobile menu is open */}
+    {mobileMenuOpen && (
+      <div
+        onClick={() => setMobileMenuOpen(false)}
+        className="lg:hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-30 transition-opacity animate-in fade-in cursor-pointer"
+        aria-hidden="true"
+      />
+    )}
     </div>
   );
 };
+
