@@ -260,7 +260,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <a
           href="#inicio"
           onClick={(e) => handleNavClick(e, '#inicio')}
-          className="flex items-center gap-3.5 group shrink-0 py-0.5"
+          className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0 flex-1 py-0.5 mr-2"
         >
           <div
             style={{
@@ -288,11 +288,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
           </div>
-          <div className="flex flex-col justify-center">
-            <span className="font-serif tracking-normal text-xs sm:text-sm lg:text-base font-bold text-white uppercase leading-tight line-clamp-2 max-w-[170px] sm:max-w-xs md:max-w-md">
+          <div className="flex flex-col justify-center min-w-0 flex-1">
+            <span className="font-serif tracking-normal text-xs sm:text-sm lg:text-base font-bold text-white uppercase leading-tight truncate sm:whitespace-normal sm:line-clamp-2">
               {settings.institution_name || 'Fundación Colegio Bilingüe de Valledupar'}
             </span>
-            <span className="text-[10px] sm:text-xs text-amber-400 font-serif font-semibold tracking-wider uppercase mt-0.5">
+            <span className="text-[10px] sm:text-xs text-amber-400 font-serif font-semibold tracking-wider uppercase mt-0.5 truncate">
               {settings.bimun_name || 'BIMUN XXVII'} • FOUNDED 1980
             </span>
           </div>
@@ -528,16 +528,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Mobile Language Switcher Pill (matches image_7bdc2661.png) */}
-          <button
-            onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-600/80 text-white text-xs font-semibold tracking-wider transition-colors cursor-pointer"
-            title={language === 'es' ? 'Switch to English' : 'Cambiar a Español'}
-          >
-            <span className="text-sm">{language === 'es' ? '🇺🇸' : '🇨🇴'}</span>
-            <span className="font-mono font-bold">{language === 'es' ? 'EN' : 'ES'}</span>
-          </button>
-
           {/* Desktop Theme Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -608,7 +598,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile Menu Toggle Button (matches image_7bdc2661.png & image_5a2d4d6d.png) */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden min-h-[44px] min-w-[44px] p-2.5 rounded-xl border-2 border-amber-400 bg-[#0e213d] hover:bg-[#152e50] text-white flex items-center justify-center shadow-md transition-all active:scale-95 cursor-pointer"
+            className="lg:hidden shrink-0 min-h-[44px] min-w-[44px] p-2.5 rounded-xl border-2 border-amber-400 bg-[#0e213d] hover:bg-[#152e50] text-white flex items-center justify-center shadow-md transition-all active:scale-95 cursor-pointer"
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
           >
@@ -778,7 +768,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Bottom utility footer bar inside dropdown */}
-          <div className="mt-6 pt-4 border-t border-amber-400/20 flex items-center justify-between text-xs text-slate-300 max-w-lg mx-auto">
+          <div className="mt-6 pt-4 border-t border-amber-400/20 flex flex-wrap items-center justify-between gap-2.5 text-xs text-slate-300 max-w-lg mx-auto">
+            {/* Language toggle inside dropdown menu */}
+            <button
+              onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white transition-colors cursor-pointer"
+              title={language === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+            >
+              <span className="text-sm">{language === 'es' ? '🇺🇸' : '🇨🇴'}</span>
+              <span className="font-bold font-mono text-amber-300">{language === 'es' ? 'EN' : 'ES'}</span>
+              <span className="text-[11px] text-slate-300">({language === 'es' ? 'English' : 'Español'})</span>
+            </button>
+
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -833,6 +834,25 @@ export const Navbar: React.FC<NavbarProps> = ({
         className="lg:hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-30 transition-opacity animate-in fade-in cursor-pointer"
         aria-hidden="true"
       />
+    )}
+
+    {/* Mobile Floating Language Switcher: Visible ONLY at the top (scrollY <= 25), mobile only */}
+    {!isScrolled && !mobileMenuOpen && (
+      <aside
+        aria-label="Selector de idioma flotante móvil"
+        className="lg:hidden fixed top-20 right-3.5 z-30 transition-all duration-300 animate-in fade-in slide-in-from-top-2"
+      >
+        <button
+          onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0c1f38]/95 hover:bg-[#132d54] text-white text-xs font-bold tracking-wider shadow-xl shadow-black/40 border-2 border-amber-400/80 backdrop-blur-md active:scale-95 transition-all cursor-pointer"
+          title={language === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+          aria-label={language === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+        >
+          <span className="text-sm">{language === 'es' ? '🇺🇸' : '🇨🇴'}</span>
+          <span className="font-mono text-amber-300 font-bold">{language === 'es' ? 'EN' : 'ES'}</span>
+          <span className="text-[10px] text-slate-300 font-medium">⇄ {language === 'es' ? 'ES' : 'EN'}</span>
+        </button>
+      </aside>
     )}
     </div>
   );
