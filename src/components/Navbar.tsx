@@ -290,10 +290,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div className="flex flex-col justify-center min-w-0 flex-1">
             <span className="font-serif tracking-normal text-xs sm:text-sm lg:text-base font-bold text-white uppercase leading-tight truncate sm:whitespace-normal sm:line-clamp-2">
-              {settings.institution_name || 'Fundación Colegio Bilingüe de Valledupar'}
+              {settings.bimun_name || 'BIMUN XXVII'}
             </span>
             <span className="text-[10px] sm:text-xs text-amber-400 font-serif font-semibold tracking-wider uppercase mt-0.5 truncate">
-              {settings.bimun_name || 'BIMUN XXVII'} • FOUNDED 1980
+              {settings.slogan || settings.institution_name || 'Fundación Colegio Bilingüe de Valledupar'}
             </span>
           </div>
         </a>
