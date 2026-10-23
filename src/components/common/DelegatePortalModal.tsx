@@ -151,7 +151,7 @@ export const DelegatePortalModal: React.FC<DelegatePortalModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Cerrar modal"
             >
               <X className="w-5 h-5" />
@@ -160,7 +160,7 @@ export const DelegatePortalModal: React.FC<DelegatePortalModalProps> = ({
         </div>
 
         {/* Content body */}
-        <div className="p-6 space-y-6 max-h-[calc(90vh-140px)] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[calc(90vh-130px)] overflow-y-auto">
           {/* Search bar */}
           <form
             onSubmit={(e) => {
@@ -179,14 +179,14 @@ export const DelegatePortalModal: React.FC<DelegatePortalModalProps> = ({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="ej. delegado@colegio.edu.co o reg_17..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                  className="w-full min-h-[44px] pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
                 />
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium text-sm transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 shrink-0"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium text-sm transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -382,7 +382,7 @@ export const DelegatePortalModal: React.FC<DelegatePortalModalProps> = ({
                     <button
                       type="button"
                       onClick={handlePrint}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-xs transition flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-xs transition flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Printer className="w-4 h-4" />
                       <span>Imprimir Vista</span>
@@ -392,7 +392,7 @@ export const DelegatePortalModal: React.FC<DelegatePortalModalProps> = ({
                       type="button"
                       onClick={handleDownloadPdf}
                       disabled={downloadingPdf}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold text-xs transition-all shadow-md hover:shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold text-xs transition-all shadow-md hover:shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                     >
                       {downloadingPdf ? (
                         <>
@@ -411,7 +411,7 @@ export const DelegatePortalModal: React.FC<DelegatePortalModalProps> = ({
                   <button
                     type="button"
                     disabled
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-500 font-medium text-xs cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-500 font-medium text-xs cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     <span>Carnet PDF Disponible tras Aprobación</span>

@@ -372,7 +372,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 mr-2"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 mr-1 cursor-pointer"
               title="Limpiar búsqueda"
             >
               <X className="w-4 h-4" />
@@ -385,7 +385,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
           <button
             onClick={onClose}
-            className="sm:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 ml-2"
+            className="sm:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 ml-1 cursor-pointer"
+            aria-label="Cerrar búsqueda"
           >
             <X className="w-5 h-5" />
           </button>

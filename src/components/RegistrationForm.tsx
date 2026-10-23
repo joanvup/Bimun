@@ -872,7 +872,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting || !isCaptchaValid}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-blue-600/30 disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[48px] px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-blue-600/30 disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
               >
                 {isSubmitting ? (
                   <>

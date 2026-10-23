@@ -237,7 +237,7 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({ schedule }) =>
                 <button
                   key={cat.id}
                   onClick={() => setActiveFilter(cat.id as any)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`min-h-[44px] px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-2 ${
                     isActive
                       ? cat.id === 'ceremonia' ? 'bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-600/20'
                         : cat.id === 'sesión' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
@@ -257,10 +257,10 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({ schedule }) =>
           </div>
 
           {/* Toggle View Mode Button */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950/60 border border-slate-800/80 rounded-xl self-start md:self-auto shadow-inner">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950/60 border border-slate-800/80 rounded-xl w-full sm:w-auto shadow-inner">
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 viewMode === 'calendar'
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
@@ -271,7 +271,7 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({ schedule }) =>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'

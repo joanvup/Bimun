@@ -94,26 +94,25 @@ export const DelegationsMatrix: React.FC<DelegationsMatrixProps> = ({
             />
           </div>
 
-          {/* Committee Select */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Committee and Status Selectors (full width on mobile) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto">
             <select
               value={selectedCommitteeId}
               onChange={(e) => setSelectedCommitteeId(e.target.value)}
-              className="py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="w-full min-h-[44px] py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">{t.delegations.filter_all_committees}</option>
               {committees.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.abbreviation} - {c.name.substring(0, 35)}...
+                  {c.abbreviation} - {c.name.substring(0, 32)}...
                 </option>
               ))}
             </select>
 
-            {/* Status Select */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="w-full min-h-[44px] py-2.5 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">{t.delegations.filter_status_all}</option>
               <option value="available">🟢 {t.delegations.filter_status_free}</option>
@@ -122,9 +121,89 @@ export const DelegationsMatrix: React.FC<DelegationsMatrixProps> = ({
           </div>
         </div>
 
-        {/* Delegations Table */}
+        {/* Delegations Container: Mobile Cards (md:hidden) & Desktop Table (hidden md:block) */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          
+          {/* 1. Mobile Cards View (Optimized for touch, thumb reach, and clean scanning) */}
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
+            {filtered.length === 0 ? (
+              <div className="py-12 px-4 text-center text-slate-500 dark:text-slate-400 text-sm">
+                {language === 'en'
+                  ? 'No delegations found matching the selected filters.'
+                  : 'No se encontraron delegaciones que coincidan con los filtros.'}
+              </div>
+            ) : (
+              filtered.map((del) => {
+                const isAvailable = del.status === 'available';
+                return (
+                  <div key={del.id} className="p-4 space-y-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                    {/* Header Row: Flag + Country Name + Status Badge */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl leading-none">{del.flag_emoji || '🏳️'}</span>
+                        <div>
+                          <p className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                            {del.country_name}
+                          </p>
+                          <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 dark:text-slate-500">
+                            {del.country_code}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Status indicator */}
+                      <div>
+                        {isAvailable ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {t.delegations.status_free}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold">
+                            <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                            {t.delegations.status_assigned}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Committee & Delegate info */}
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold border border-blue-100 dark:border-blue-800/60">
+                        {del.committee_abbr || del.committee_name}
+                      </span>
+
+                      {!isAvailable && del.delegate_name && (
+                        <span className="text-slate-500 dark:text-slate-400 truncate max-w-[170px] text-right font-medium">
+                          {del.delegate_name}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Action Button: Full-width 44px thumb target for applying */}
+                    {isAvailable && (
+                      <div className="pt-1">
+                        <a
+                          href="#inscripciones"
+                          onClick={() => {
+                            if (onSelectDelegationForRegister && del.committee_name && del.country_name) {
+                              onSelectDelegationForRegister(del.committee_name, del.country_name);
+                            }
+                          }}
+                          className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.98]"
+                        >
+                          <span>{t.delegations.apply_btn}</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 2. Desktop Table View (Full width on md and lg screens) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm text-slate-600 dark:text-slate-300">
               <thead className="bg-slate-50/80 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 uppercase text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider">
                 <tr>
