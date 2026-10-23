@@ -299,12 +299,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </a>
 
         {/* Grouped Desktop Navigation Bar */}
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-1">
           {/* Direct link: Home */}
           <a
             href="#inicio"
             onClick={(e) => handleNavClick(e, '#inicio')}
-            className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3.5 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors"
+            className="text-xs font-semibold uppercase tracking-wider text-slate-200 hover:text-white px-3.5 py-2 rounded-lg hover:bg-white/10 transition-colors"
           >
             {t.nav.home}
           </a>
@@ -501,7 +501,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Desktop Dual Language Switcher */}
-          <div className="hidden lg:flex items-center bg-slate-900/90 border border-slate-700 rounded-xl p-0.5 shadow-sm">
+          <div className="hidden md:flex items-center bg-slate-900/90 border border-slate-700 rounded-xl p-0.5 shadow-sm">
             <button
               onClick={() => setLanguage('es')}
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -531,7 +531,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Desktop Theme Toggle Button */}
           <button
             onClick={toggleTheme}
-            className="hidden lg:flex p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-amber-300 transition-all shadow-sm cursor-pointer"
+            className="hidden md:flex p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-amber-300 transition-all shadow-sm cursor-pointer"
             title={
               isDark
                 ? language === 'en'
@@ -555,7 +555,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <a
               href="#inscripciones"
               onClick={(e) => handleNavClick(e, '#inscripciones')}
-              className="hidden lg:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all hover:shadow-blue-600/50 items-center gap-1.5"
+              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all hover:shadow-blue-600/50 items-center gap-1.5"
             >
               <UserCheck className="w-3.5 h-3.5" />
               <span>{t.nav.register}</span>
@@ -566,7 +566,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenDelegatePortal && (
             <button
               onClick={onOpenDelegatePortal}
-              className="hidden lg:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 hover:border-amber-500/70 transition-all items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
+              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 hover:border-amber-500/70 transition-all items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
               title={language === 'en' ? 'Delegate Area / Digital Badge' : 'Área del Delegado / Carnet Digital'}
             >
               <FileBadge className="w-3.5 h-3.5 text-amber-400" />
@@ -578,7 +578,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isAdminLoggedIn ? (
             <button
               onClick={onGoToCMS}
-              className="hidden lg:flex text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 items-center gap-1.5 transition-colors cursor-pointer"
+              className="hidden md:flex text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 items-center gap-1.5 transition-colors cursor-pointer"
               title="Ir al Panel Administrativo"
             >
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
@@ -587,7 +587,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={onOpenCMS}
-              className="hidden lg:flex text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 items-center gap-1.5 transition-colors cursor-pointer"
+              className="hidden md:flex text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 items-center gap-1.5 transition-colors cursor-pointer"
               title="Acceso Administrativo Secretaría"
             >
               <Lock className="w-3.5 h-3.5 text-slate-400" />
@@ -598,7 +598,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile Menu Toggle Button (matches image_7bdc2661.png & image_5a2d4d6d.png) */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden shrink-0 min-h-[44px] min-w-[44px] p-2.5 rounded-xl border-2 border-amber-400 bg-[#0e213d] hover:bg-[#152e50] text-white flex items-center justify-center shadow-md transition-all active:scale-95 cursor-pointer"
+            className="md:hidden shrink-0 min-h-[44px] min-w-[44px] p-2.5 rounded-xl border-2 border-amber-400 bg-[#0e213d] hover:bg-[#152e50] text-white flex items-center justify-center shadow-md transition-all active:scale-95 cursor-pointer"
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
           >
@@ -614,7 +614,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Full-Width Accordion Dropdown Panel (matches image_5a2d4d6d.png) */}
       {mobileMenuOpen && (
         <div
-          className="lg:hidden absolute top-full left-0 right-0 bg-[#0c1f38] text-white shadow-2xl border-t border-amber-400/30 border-b-2 border-amber-400/40 z-50 px-5 sm:px-8 py-6 transition-all duration-300 ease-out animate-in slide-in-from-top-2"
+          className="md:hidden absolute top-full left-0 right-0 bg-[#0c1f38] text-white shadow-2xl border-t border-amber-400/30 border-b-2 border-amber-400/40 z-50 px-5 sm:px-8 py-6 transition-all duration-300 ease-out animate-in slide-in-from-top-2"
           role="dialog"
           aria-label="Menú desplegable móvil"
         >
