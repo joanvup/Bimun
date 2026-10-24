@@ -317,7 +317,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-600 selection:text-white font-sans transition-colors duration-300">
+    <div className="min-h-screen flex flex-col bg-[#f8f9ff] dark:bg-[#060f1e] text-slate-900 dark:text-slate-100 selection:bg-[#00658e] selection:text-white font-sans transition-colors duration-300">
       {/* Institutional Navigation Bar */}
       <Navbar
         settings={settings}

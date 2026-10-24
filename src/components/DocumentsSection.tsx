@@ -70,13 +70,13 @@ export const DocumentsSection: React.FC<DocumentsSectionProps> = ({ documents })
   };
 
   return (
-    <section id="documentos" className="py-24 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800/80 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
-          <span className="text-xs font-bold uppercase tracking-widest text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-3.5 py-1 rounded-full border border-blue-200 dark:border-blue-800/60">
+    <section id="documentos" className="py-20 sm:py-24 bg-white dark:bg-[#060f1e] border-b border-slate-200/90 dark:border-slate-800 transition-colors">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <div className="text-center max-w-3xl mx-auto space-y-3">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#00658e] dark:text-[#83cfff] bg-[#c7e7ff]/60 dark:bg-[#00658e]/20 px-3.5 py-1 rounded-full border border-[#00658e]/20">
             {t.documents.badge}
           </span>
-          <h2 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-[#000d23] dark:text-white tracking-tight">
             {t.documents.title}
           </h2>
           <p className="text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed">
@@ -84,15 +84,15 @@ export const DocumentsSection: React.FC<DocumentsSectionProps> = ({ documents })
           </p>
 
           {/* Categories */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-4">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 pt-4">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer ${
+                className={`text-xs font-semibold px-4 py-2 rounded-lg transition-all cursor-pointer ${
                   activeCategory === cat
-                    ? 'bg-blue-900 dark:bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-transparent dark:border-slate-800'
+                    ? 'bg-[#000d23] text-white shadow-xs'
+                    : 'bg-[#eff4ff] dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-[#000d23] dark:hover:text-white border border-slate-200 dark:border-slate-700'
                 }`}
               >
                 {cat === 'all' ? t.documents.category_all : cat}

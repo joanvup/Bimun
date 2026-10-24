@@ -245,14 +245,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <div className="dark">
+    <>
+      {/* Top Slim Announcement Ribbon (Matches Diplomatic Summit Reference) */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#000d23] text-white py-1.5 px-4 text-center flex items-center justify-center gap-2 text-[11px] sm:text-xs font-medium tracking-wide">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#4cc1ff] shrink-0 animate-pulse"></span>
+        <span className="truncate max-w-[280px] sm:max-w-none">
+          {settings.bimun_name || 'BIMUN XXVII'}: “{settings.slogan || 'Peace in Progress'}” — {language === 'en' ? 'Registrations & committee allocations open' : 'Inscripciones y asignación de comités abiertas'}
+        </span>
+        <span className="hidden sm:inline-block text-slate-500">•</span>
+        <a
+          href="#inscripciones"
+          onClick={(e) => handleNavClick(e, '#inscripciones')}
+          className="hidden sm:inline-flex items-center text-[#83cfff] hover:text-white transition-colors underline underline-offset-2 font-semibold text-xs"
+        >
+          {language === 'en' ? 'Register Delegation →' : 'Inscribir Delegación →'}
+        </a>
+      </div>
+
       <header
         ref={navRef}
         id="main-navbar"
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
+        className={`fixed top-7 left-0 right-0 z-40 transition-all duration-300 ${
           isScrolled
-            ? 'bg-[#0c1f38]/98 backdrop-blur-md shadow-xl py-2.5 border-b border-amber-400/25'
-            : 'bg-gradient-to-b from-[#0c1f38] via-[#0c1f38]/95 to-[#0c1f38]/90 py-3 sm:py-3.5 border-b border-amber-400/20'
+            ? 'bg-white/95 dark:bg-[#0c1f38]/95 backdrop-blur-md shadow-[0_1px_8px_rgba(13,35,66,0.08)] py-2 border-b border-slate-200/90 dark:border-slate-800'
+            : 'bg-white/90 dark:bg-[#0c1f38]/90 backdrop-blur-md py-2.5 sm:py-3 border-b border-slate-200/70 dark:border-slate-800/80 shadow-xs'
         }`}
       >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
@@ -267,9 +283,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               width: `var(--nav-logo-w, ${logoDimension}px)`,
               height: `var(--nav-logo-h, ${logoDimension}px)`,
             }}
-            className="rounded-full aspect-square bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-800 p-0.5 shadow-lg shadow-blue-600/30 group-hover:scale-105 transition-transform flex items-center justify-center overflow-hidden shrink-0"
+            className="rounded-full aspect-square bg-[#000d23] p-0.5 shadow-md shadow-[#000d23]/20 group-hover:scale-105 transition-transform flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/80 dark:border-slate-700"
           >
-            <div className="w-full h-full bg-slate-950 rounded-full flex items-center justify-center overflow-hidden">
+            <div className="w-full h-full bg-white dark:bg-slate-950 rounded-full flex items-center justify-center overflow-hidden">
               {settings.logo_url ? (
                 <img
                   src={settings.logo_url}
@@ -283,16 +299,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                     width: `${iconSize}px`,
                     height: `${iconSize}px`,
                   }}
-                  className="text-blue-400 transition-all"
+                  className="text-[#00658e] dark:text-[#009edb] transition-all"
                 />
               )}
             </div>
           </div>
           <div className="flex flex-col justify-center min-w-0 flex-1">
-            <span className="font-serif tracking-normal text-xs sm:text-sm lg:text-base font-bold text-white uppercase leading-tight truncate sm:whitespace-normal sm:line-clamp-2">
+            <span className="font-serif tracking-tight text-xs sm:text-base lg:text-lg font-bold text-[#000d23] dark:text-white uppercase leading-tight truncate sm:whitespace-normal sm:line-clamp-2">
               {settings.bimun_name || 'BIMUN XXVII'}
             </span>
-            <span className="text-[10px] sm:text-xs text-amber-400 font-serif font-semibold tracking-wider uppercase mt-0.5 truncate">
+            <span className="text-[10px] sm:text-xs text-[#00658e] dark:text-[#009edb] font-serif font-semibold tracking-wider uppercase mt-0.5 truncate">
               {settings.slogan || settings.institution_name || 'Fundación Colegio Bilingüe de Valledupar'}
             </span>
           </div>
@@ -304,7 +320,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <a
             href="#inicio"
             onClick={(e) => handleNavClick(e, '#inicio')}
-            className="text-xs font-semibold uppercase tracking-wider text-slate-200 hover:text-white px-3.5 py-2 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200 hover:text-[#000d23] dark:hover:text-white px-3.5 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors"
           >
             {t.nav.home}
           </a>
@@ -487,27 +503,27 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenSearch && (
             <button
               onClick={onOpenSearch}
-              className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-white transition-all shadow-sm text-xs group cursor-pointer"
+              className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all shadow-xs text-xs group cursor-pointer"
               title={language === 'en' ? 'Search (Ctrl+K / ⌘K)' : 'Buscar comisiones, documentos, noticias... (Ctrl+K / ⌘K)'}
             >
-              <Search className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
-              <span className="text-slate-200 font-medium">
+              <Search className="w-3.5 h-3.5 text-[#00658e] dark:text-[#009edb] group-hover:scale-110 transition-transform" />
+              <span className="text-slate-600 dark:text-slate-300 font-medium">
                 {language === 'en' ? 'Quick Search...' : 'Buscar...'}
               </span>
-              <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+              <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 text-[10px] font-mono text-slate-500 border border-slate-200 dark:border-slate-700">
                 ⌘K
               </kbd>
             </button>
           )}
 
           {/* Desktop Dual Language Switcher */}
-          <div className="hidden md:flex items-center bg-slate-900/90 border border-slate-700 rounded-xl p-0.5 shadow-sm">
+          <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-xs">
             <button
               onClick={() => setLanguage('es')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
                 language === 'es'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#000d23] text-white dark:bg-[#009edb] dark:text-slate-950 font-black shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Cambiar a Español"
             >
@@ -516,10 +532,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => setLanguage('en')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
                 language === 'en'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#000d23] text-white dark:bg-[#009edb] dark:text-slate-950 font-black shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Switch to English"
             >
@@ -531,7 +547,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Desktop Theme Toggle Button */}
           <button
             onClick={toggleTheme}
-            className="hidden md:flex p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-amber-300 transition-all shadow-sm cursor-pointer"
+            className="hidden md:flex p-2 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-[#00658e] dark:hover:text-amber-300 transition-all shadow-xs cursor-pointer"
             title={
               isDark
                 ? language === 'en'
@@ -546,7 +562,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isDark ? (
               <Sun className="w-4 h-4 text-amber-400 animate-in spin-in-90 duration-300" />
             ) : (
-              <Moon className="w-4 h-4 text-indigo-400 animate-in spin-in-90 duration-300" />
+              <Moon className="w-4 h-4 text-[#00658e] animate-in spin-in-90 duration-300" />
             )}
           </button>
 
@@ -555,9 +571,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <a
               href="#inscripciones"
               onClick={(e) => handleNavClick(e, '#inscripciones')}
-              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all hover:shadow-blue-600/50 items-center gap-1.5"
+              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg bg-[#000d23] hover:bg-[#0d2342] text-white shadow-sm hover:shadow transition-all items-center gap-1.5"
             >
-              <UserCheck className="w-3.5 h-3.5" />
+              <UserCheck className="w-3.5 h-3.5 text-[#83cfff]" />
               <span>{t.nav.register}</span>
             </a>
           )}
@@ -566,10 +582,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenDelegatePortal && (
             <button
               onClick={onOpenDelegatePortal}
-              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 hover:border-amber-500/70 transition-all items-center gap-1.5 cursor-pointer shadow-sm hover:shadow"
+              className="hidden md:inline-flex text-xs font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg bg-[#00658e]/10 hover:bg-[#00658e]/20 text-[#00658e] dark:text-[#009edb] border border-[#00658e]/30 font-bold transition-all items-center gap-1.5 cursor-pointer shadow-xs"
               title={language === 'en' ? 'Delegate Area / Digital Badge' : 'Área del Delegado / Carnet Digital'}
             >
-              <FileBadge className="w-3.5 h-3.5 text-amber-400" />
+              <FileBadge className="w-3.5 h-3.5" />
               <span>{language === 'en' ? 'My Badge' : 'Mi Carnet'}</span>
             </button>
           )}
@@ -578,34 +594,34 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isAdminLoggedIn ? (
             <button
               onClick={onGoToCMS}
-              className="hidden md:flex text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 items-center gap-1.5 transition-colors cursor-pointer"
+              className="hidden md:flex text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 items-center gap-1.5 transition-colors cursor-pointer"
               title="Ir al Panel Administrativo"
             >
-              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>{t.nav.cms_panel}</span>
             </button>
           ) : (
             <button
               onClick={onOpenCMS}
-              className="hidden md:flex text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 items-center gap-1.5 transition-colors cursor-pointer"
+              className="hidden md:flex text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 items-center gap-1.5 transition-colors cursor-pointer"
               title="Acceso Administrativo Secretaría"
             >
-              <Lock className="w-3.5 h-3.5 text-slate-400" />
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
               <span>{t.nav.cms}</span>
             </button>
           )}
 
-          {/* Mobile Menu Toggle Button (matches image_7bdc2661.png & image_5a2d4d6d.png) */}
+          {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden shrink-0 min-h-[44px] min-w-[44px] p-2.5 rounded-xl border-2 border-amber-400 bg-[#0e213d] hover:bg-[#152e50] text-white flex items-center justify-center shadow-md transition-all active:scale-95 cursor-pointer"
+            className="md:hidden shrink-0 min-h-[44px] min-w-[44px] p-2.5 rounded-lg border-2 border-slate-300 dark:border-amber-400 bg-white dark:bg-[#0e213d] text-slate-900 dark:text-white flex items-center justify-center shadow-sm transition-all active:scale-95 cursor-pointer"
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
           >
             {mobileMenuOpen ? (
-              <X className="w-5 h-5 text-white stroke-[2.5]" />
+              <X className="w-5 h-5 stroke-[2.5]" />
             ) : (
-              <Menu className="w-5 h-5 text-white stroke-[2.5]" />
+              <Menu className="w-5 h-5 stroke-[2.5]" />
             )}
           </button>
         </div>
@@ -854,7 +870,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
       </aside>
     )}
-    </div>
+    </>
   );
 };
 

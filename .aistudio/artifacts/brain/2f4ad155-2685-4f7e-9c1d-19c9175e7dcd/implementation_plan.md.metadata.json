@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de diseño del menú móvil adaptado a BIMUN: Aplica el patrón visual exacto de las imágenes de referencia (botón con borde dorado conmutable ☰ / ✕, panel desplegable superior en azul marino profundo, enlaces académicos del modelo con 'Inicio' en dorado, y botones circulares para 'Mi Carnet', 'Guías' y 'Búsqueda'), manteniendo todo el contenido y funcionalidades del BIMUN sin elementos flotantes residuales.",
-  "updatedAt":  "2026-10-23T01:22:21.161689925Z",
+  "summary":  "Plan de rediseño visual 'Diplomatic Summit' para BIMUN: adopción del sistema cromático azul diplomático (#0D2342), cian ONU (#009EDB) y oro cálido (#D97706), tipografía Playfair Display y Plus Jakarta Sans, cabecera institucional clara con barra superior de anuncios, tarjetas blancas pulidas con métricas de asignación y estética editorial multilateral sin alterar ni agregar secciones.",
+  "updatedAt":  "2026-10-24T00:50:26.109522223Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -32,13 +32,13 @@ export const GallerySection: React.FC<GallerySectionProps> = ({ gallery, configu
   if (!gallery || gallery.length === 0) return null;
 
   return (
-    <section id="galeria" className="py-24 bg-slate-100/60 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
-          <span className="text-xs font-bold uppercase tracking-widest text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/60 px-3.5 py-1 rounded-full border border-blue-200 dark:border-blue-800/60">
+    <section id="galeria" className="py-20 sm:py-24 bg-[#eff4ff] dark:bg-[#081426] border-b border-slate-200/90 dark:border-slate-800 transition-colors">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <div className="text-center max-w-3xl mx-auto space-y-3">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#00658e] dark:text-[#83cfff] bg-[#c7e7ff]/60 dark:bg-[#00658e]/20 px-3.5 py-1 rounded-full border border-[#00658e]/20">
             {t.gallery.badge}
           </span>
-          <h2 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-[#000d23] dark:text-white tracking-tight">
             {t.gallery.title}
           </h2>
           <p className="text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed">

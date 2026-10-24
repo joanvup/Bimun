@@ -40,19 +40,23 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
   };
 
   return (
-    <section id="contacto" className="py-24 bg-slate-900 text-white relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="contacto" className="py-20 sm:py-24 bg-[#000d23] text-white relative overflow-hidden">
+      {/* Subtle UN Cyan Atmospheric Glow (from reference) */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#4cc1ff]/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[#00658e]/20 blur-3xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Column: Institutional Info */}
           <div className="lg:col-span-6 space-y-6">
-            <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
+            <div className="space-y-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#83cfff] bg-[#00658e]/30 px-3 py-1 rounded-full border border-[#00658e]/40 inline-block">
                 {t.contact.badge}
               </span>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold text-white tracking-tight">
+              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
                 {t.contact.title}
               </h2>
-              <p className="text-sm text-slate-300 leading-relaxed max-w-lg">
+              <p className="text-base text-slate-300 leading-relaxed max-w-lg">
                 {t.contact.subtitle}
               </p>
             </div>
